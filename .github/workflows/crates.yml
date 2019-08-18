@@ -25,7 +25,11 @@ jobs:
       # the GitHub Action "release" event is a little trickier than I thought
       if: >-
         github.event_name == 'release' &&
-        contains(['created', 'published', 'prereleased'], github.event.action) &&
+        (
+          github.event.action == 'created' ||
+          github.event.action == 'prereleased' ||
+          github.event.action == 'published'
+        ) &&
         !github.event.release.draft &&
         github.event.release.published_at
       env:
