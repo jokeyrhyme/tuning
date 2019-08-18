@@ -19,12 +19,12 @@ jobs:
     name: Publish to crates.io
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published'
     steps:
     - uses: actions/checkout@v1
     - run: curl https://sh.rustup.rs -sSf | sh -s -- -y
     - run: ~/.cargo/bin/rustup self update
     - run: ~/.cargo/bin/cargo publish
+      if: github.event_name == 'release' && github.event.action == 'published'
       env:
         CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
