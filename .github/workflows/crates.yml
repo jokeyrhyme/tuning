@@ -26,5 +26,5 @@ jobs:
     - run: ~/.cargo/bin/rustup self update
     - run: ~/.cargo/bin/cargo publish
       env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_TOKEN }}
-    
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
