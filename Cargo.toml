@@ -1,10 +1,14 @@
 [package]
 name = "tuning"
 description = "ansible-like tool with a smaller scope, focused primarily on complementing dotfiles for cross-machine bliss"
+keywords = ["ansible", "dotfiles"]
+homepage = "https://github.com/jokeyrhyme/tuning"
+repository = "https://github.com/jokeyrhyme/tuning"
 version = "0.1.5"
 authors = ["Ron Waldon <jokeyrhyme@gmail.com>"]
 license = "MIT"
 edition = "2018"
+maintenance = { status = "experimental" }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
