@@ -1,0 +1,30 @@
+name: Crates
+
+on: [release]
+
+jobs:
+  test:
+    name: Test on ubuntu-latest
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - run: curl https://sh.rustup.rs -sSf | sh -s -- -y
+    - run: ~/.cargo/bin/rustup self update
+    - run: ~/.cargo/bin/rustup update
+    - run: ~/.cargo/bin/rustup component add clippy
+    - run: ~/.cargo/bin/cargo build --verbose
+    - run: ~/.cargo/bin/cargo test --verbose
+    - run: ~/.cargo/bin/cargo clippy --all-features --all-targets -- -D clippy::all
+  publish:
+    name: Publish to crates.io
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+    - uses: actions/checkout@v1
+    - run: curl https://sh.rustup.rs -sSf | sh -s -- -y
+    - run: ~/.cargo/bin/rustup self update
+    - run: ~/.cargo/bin/cargo publish
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_TOKEN }}
+    

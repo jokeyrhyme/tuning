@@ -1,0 +1,23 @@
+name: Rust
+
+on: [push]
+
+jobs:
+  test:
+
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest] # windows-latest
+    steps:
+    - uses: actions/checkout@v1
+    - run: curl https://sh.rustup.rs -sSf | sh -s -- -y
+    - run: ~/.cargo/bin/rustup self update
+    - run: ~/.cargo/bin/rustup update
+    - run: ~/.cargo/bin/rustup component add clippy
+    - run: ~/.cargo/bin/cargo build --verbose
+    - run: ~/.cargo/bin/cargo test --verbose
+    - run: ~/.cargo/bin/cargo clippy --all-features --all-targets -- -D clippy::all
+
+
