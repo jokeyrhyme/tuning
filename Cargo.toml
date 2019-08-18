@@ -1,7 +1,7 @@
 [package]
 name = "tuning"
 description = "ansible-like tool with a smaller scope, focused primarily on complementing dotfiles for cross-machine bliss"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Ron Waldon <jokeyrhyme@gmail.com>"]
 license = "MIT"
 edition = "2018"
