@@ -1,7 +1,9 @@
 [package]
 name = "tuning"
+description = "ansible-like tool with a smaller scope, focused primarily on complementing dotfiles for cross-machine bliss"
 version = "0.1.2"
 authors = ["Ron Waldon <jokeyrhyme@gmail.com>"]
+license = "MIT"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
