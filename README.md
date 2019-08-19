@@ -35,8 +35,26 @@ ansible-like tool with a smaller scope, focused primarily on complementing dotfi
   which are fine for web services that run in containers,
   but can be overly-sensitive to interpreter versions and globally-installed packages
 
+# prerequisites
+
+- Rust compiler and `cargo`: https://rustup.rs/
+
+# getting started
+
+```
+$ cargo install tuning
+$ tuning
+```
+
+# documentation
+
+- read about the [jobs configuration file format](https://github.com/jokeyrhyme/tuning/wiki/Jobs-definition)
+
 # roadmap
 
-- [ ] read config from user's HOME directory
+- [x] read config from user's HOME directory
+- [ ] support the "command" job
+- [ ] support the "file" job
+- [ ] support the "git" job
 - [ ] flag to point at a different config file
 - [ ] `import` or `include` to help decompose large config files
