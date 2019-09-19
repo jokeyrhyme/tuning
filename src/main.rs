@@ -1,6 +1,10 @@
+mod lib;
+
 use std::{fs, io};
 
 use dirs;
+
+use lib::{jobs, runner};
 
 fn main() -> io::Result<()> {
     let config_path = dirs::config_dir()
@@ -9,6 +13,9 @@ fn main() -> io::Result<()> {
         .join("main.toml");
 
     println!("reading: {}", &config_path.display());
-    println!("{}", fs::read_to_string(&config_path)?);
+    let text = fs::read_to_string(&config_path)?;
+    let mut m = jobs::from_str(&text);
+    runner::run(&mut m.jobs);
+
     Ok(())
 }

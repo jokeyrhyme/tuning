@@ -34,7 +34,7 @@ ansible-like tool with a smaller scope, focused primarily on complementing dotfi
 - other existing tools use interpretted languages,
   which are fine for web services that run in containers,
   but can be overly-sensitive to interpreter versions and globally-installed packages
-  
+
 - yes, I am firmly trapped in [The Code/Data Cycle](https://twitter.com/niklasfrykholm/status/1063242674717679621)
 
 # prerequisites
@@ -60,3 +60,5 @@ $ tuning
 - [ ] support the "git" job
 - [ ] flag to point at a different config file
 - [ ] `import` or `include` to help decompose large config files
+- [ ] `when` to support conditional execution of jobs
+- [ ] `needs` to support optional sequencing of jobs

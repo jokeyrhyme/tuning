@@ -13,5 +13,6 @@ maintenance = { status = "experimental" }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-dirs = "2.0.2"
-
+dirs = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.5"
