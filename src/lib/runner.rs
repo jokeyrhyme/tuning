@@ -1,3 +1,5 @@
+#![deny(clippy::all)]
+
 use crate::jobs::Execute;
 
 pub fn run(jobs: &mut Vec<impl Execute>) {
