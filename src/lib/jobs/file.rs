@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use super::Execute;
+use super::Status;
 
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -22,11 +22,13 @@ pub enum FileState {
 pub struct File {
     pub name: Option<String>,
     pub needs: Option<Vec<String>>,
-    pub src: Option<PathBuf>,
     pub path: PathBuf,
+    pub src: Option<PathBuf>,
     pub state: FileState,
 }
 
-impl Execute for File {
-    fn execute(&mut self) {}
+impl File {
+    pub fn execute(&self) -> super::Result {
+        Ok(Status::Done)
+    }
 }

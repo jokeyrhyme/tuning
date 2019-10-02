@@ -61,4 +61,4 @@ $ tuning
 - [ ] flag to point at a different config file
 - [ ] `import` or `include` to help decompose large config files
 - [ ] `when` to support conditional execution of jobs
-- [ ] `needs` to support optional sequencing of jobs
+- [x] `needs` to support optional sequencing of jobs

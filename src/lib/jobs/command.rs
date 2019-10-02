@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use super::Execute;
+use super::Status;
 
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase", tag = "type")]
@@ -17,7 +17,8 @@ pub struct Command {
     pub creates: Option<PathBuf>,
     pub removes: Option<PathBuf>,
 }
-
-impl Execute for Command {
-    fn execute(&mut self) {}
+impl Command {
+    pub fn execute(&self) -> super::Result {
+        Ok(Status::Done)
+    }
 }

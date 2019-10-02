@@ -3,14 +3,35 @@
 mod command;
 mod file;
 
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 use toml;
 
 use command::Command;
 use file::File;
 
+#[derive(Clone, Debug)]
+pub enum Error {
+    Other(String),
+}
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Other(s) => s,
+            }
+        )
+    }
+}
+impl std::error::Error for Error {}
+
 pub trait Execute {
-    fn execute(&mut self) {}
+    fn execute(&self) -> Result;
+    fn name(&self) -> String;
+    fn needs(&self) -> Vec<String>;
 }
 
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
@@ -20,10 +41,30 @@ pub enum Job {
     File(File),
 }
 impl Execute for Job {
-    fn execute(&mut self) {
+    fn execute(&self) -> Result {
         match self {
             Job::Command(j) => j.execute(),
             Job::File(j) => j.execute(),
+        }
+    }
+    fn name(&self) -> String {
+        let name = match self {
+            Job::Command(j) => j.name.clone(),
+            Job::File(j) => j.name.clone(),
+        };
+        match name {
+            Some(n) => n,
+            None => format!("{:?}", self),
+        }
+    }
+    fn needs(&self) -> Vec<String> {
+        let needs = match self {
+            Job::Command(j) => j.needs.clone(),
+            Job::File(j) => j.needs.clone(),
+        };
+        match needs {
+            Some(n) => n,
+            None => vec![],
         }
     }
 }
@@ -31,6 +72,16 @@ impl Execute for Job {
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct Main {
     pub jobs: Vec<Job>,
+}
+
+pub type Result = std::result::Result<Status, Error>;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Status {
+    Blocked, // when "needs" are not yet Done
+    InProgress,
+    Done,
+    Pending, // when no "needs" or "needs" are all Done
 }
 
 pub fn from_str<S>(s: S) -> Main
