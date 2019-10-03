@@ -21,10 +21,13 @@ pub fn run(jobs: &mut Vec<impl Execute>) {
             match results.get(&name).unwrap() {
                 Ok(Status::Pending) => {
                     results.insert(name.clone(), Ok(Status::InProgress));
-                    results.insert(name, job.execute());
+                    println!("job: {}: {:?}", &name, results.get(&name).unwrap());
+                    results.insert(name.clone(), job.execute());
+                    println!("job: {}: {:?}", &name, results.get(&name).unwrap());
                 }
-                Ok(Status::Blocked) => {}
-                _ => {}
+                _ => {
+                    println!("job: {}: {:?}", &name, results.get(&name).unwrap());
+                }
             }
         });
         for job in jobs.iter() {

@@ -3,9 +3,10 @@
 mod command;
 mod file;
 
-use std::fmt;
+use std::{fmt, io};
 
 use serde::{Deserialize, Serialize};
+use subprocess::PopenError;
 use toml;
 
 use command::Command;
@@ -27,6 +28,16 @@ impl std::fmt::Display for Error {
     }
 }
 impl std::error::Error for Error {}
+impl From<PopenError> for Error {
+    fn from(src: PopenError) -> Self {
+        Error::Other(format!("{:?}", src))
+    }
+}
+impl From<io::Error> for Error {
+    fn from(src: io::Error) -> Self {
+        Error::Other(format!("{:?}", src))
+    }
+}
 
 pub trait Execute {
     fn execute(&self) -> Result;
@@ -115,12 +126,9 @@ mod tests {
         let want = Main {
             jobs: vec![Job::Command(Command {
                 name: Some(String::from("run something")),
-                needs: None,
                 argv: Some(vec![String::from("foo")]),
-                chdir: None,
                 command: String::from("something"),
-                creates: None,
-                removes: None,
+                ..Default::default()
             })],
         };
 
