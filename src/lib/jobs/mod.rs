@@ -86,13 +86,37 @@ pub struct Main {
 }
 
 pub type Result = std::result::Result<Status, Error>;
+pub fn is_result_settled(result: &Result) -> bool {
+    match result {
+        Ok(s) => match s {
+            Status::Blocked => true,
+            _ => s.is_done(),
+        },
+        Err(_) => true,
+    }
+}
+pub fn is_result_done(result: &Result) -> bool {
+    match result {
+        Ok(s) => s.is_done(),
+        Err(_) => false,
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Status {
     Blocked, // when "needs" are not yet Done
-    InProgress,
     Done,
-    Pending, // when no "needs" or "needs" are all Done
+    InProgress,
+    NoChange(String), // more specific kind of Done
+    Pending,          // when no "needs" or "needs" are all Done
+}
+impl Status {
+    pub fn is_done(&self) -> bool {
+        match &self {
+            Self::Done | Self::NoChange(_) => true,
+            _ => false,
+        }
+    }
 }
 
 pub fn from_str<S>(s: S) -> Main

@@ -2,11 +2,12 @@
 
 use std::collections::HashMap;
 
-use crate::jobs::{self, Execute, Status};
+use crate::jobs::{self, is_result_done, is_result_settled, Execute, Status};
 
 pub fn run(jobs: &mut Vec<impl Execute>) {
     let mut results = HashMap::<String, jobs::Result>::new();
 
+    // ensure every job has a registered Status
     jobs.iter().for_each(|job| {
         if job.needs().is_empty() {
             results.insert(job.name(), Ok(Status::Pending));
@@ -14,7 +15,8 @@ pub fn run(jobs: &mut Vec<impl Execute>) {
             results.insert(job.name(), Ok(Status::Blocked));
         }
     });
-    while results.is_empty() || !is_all_done(&results) {
+
+    while !is_all_settled(&results) {
         jobs.iter().for_each(|job| {
             let name = job.name();
             // this .unwrap() is fine, as all jobs have a registered Status
@@ -38,7 +40,7 @@ pub fn run(jobs: &mut Vec<impl Execute>) {
             if job
                 .needs()
                 .iter()
-                .all(|n| is_equal_status(results.get(n).unwrap(), &Status::Done))
+                .all(|n| is_result_done(results.get(n).unwrap()))
             {
                 results.insert(name, Ok(Status::Pending));
             }
@@ -46,14 +48,8 @@ pub fn run(jobs: &mut Vec<impl Execute>) {
     }
 }
 
-fn is_all_done(results: &HashMap<String, jobs::Result>) -> bool {
-    results.iter().all(|(_, result)| match result {
-        Ok(s) => match s {
-            Status::Blocked | Status::Done => true,
-            _ => false,
-        },
-        Err(_) => true,
-    })
+fn is_all_settled(results: &HashMap<String, jobs::Result>) -> bool {
+    results.iter().all(|(_, result)| is_result_settled(result))
 }
 
 fn is_equal_status(result: &jobs::Result, status: &Status) -> bool {
@@ -122,7 +118,7 @@ mod tests {
 
     #[test]
     fn run_executes_unordered_jobs() {
-        let (a, a_spy) = FakeJob::new("a", Ok(jobs::Status::Done));
+        let (a, a_spy) = FakeJob::new("a", Ok(jobs::Status::NoChange(String::from("a"))));
         let (b, b_spy) = FakeJob::new("b", Ok(jobs::Status::Done));
 
         let mut jobs = vec![a, b];
@@ -139,7 +135,7 @@ mod tests {
     #[test]
     fn run_executes_ordered_jobs() {
         let (mut a, a_spy) = FakeJob::new("a", Ok(jobs::Status::Done));
-        let (b, b_spy) = FakeJob::new("b", Ok(jobs::Status::Done));
+        let (b, b_spy) = FakeJob::new("b", Ok(jobs::Status::NoChange(String::from("b"))));
         a.needs.push(String::from("b"));
 
         let mut jobs = vec![a, b];
