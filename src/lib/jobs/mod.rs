@@ -3,9 +3,10 @@
 mod command;
 mod file;
 
-use std::fmt;
+use std::{fmt, io};
 
 use serde::{Deserialize, Serialize};
+use subprocess::PopenError;
 use toml;
 
 use command::Command;
@@ -27,6 +28,16 @@ impl std::fmt::Display for Error {
     }
 }
 impl std::error::Error for Error {}
+impl From<PopenError> for Error {
+    fn from(src: PopenError) -> Self {
+        Error::Other(format!("{:?}", src))
+    }
+}
+impl From<io::Error> for Error {
+    fn from(src: io::Error) -> Self {
+        Error::Other(format!("{:?}", src))
+    }
+}
 
 pub trait Execute {
     fn execute(&self) -> Result;
@@ -75,13 +86,37 @@ pub struct Main {
 }
 
 pub type Result = std::result::Result<Status, Error>;
+pub fn is_result_settled(result: &Result) -> bool {
+    match result {
+        Ok(s) => match s {
+            Status::Blocked => true,
+            _ => s.is_done(),
+        },
+        Err(_) => true,
+    }
+}
+pub fn is_result_done(result: &Result) -> bool {
+    match result {
+        Ok(s) => s.is_done(),
+        Err(_) => false,
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Status {
     Blocked, // when "needs" are not yet Done
-    InProgress,
     Done,
-    Pending, // when no "needs" or "needs" are all Done
+    InProgress,
+    NoChange(String), // more specific kind of Done
+    Pending,          // when no "needs" or "needs" are all Done
+}
+impl Status {
+    pub fn is_done(&self) -> bool {
+        match &self {
+            Self::Done | Self::NoChange(_) => true,
+            _ => false,
+        }
+    }
 }
 
 pub fn from_str<S>(s: S) -> Main
@@ -115,12 +150,9 @@ mod tests {
         let want = Main {
             jobs: vec![Job::Command(Command {
                 name: Some(String::from("run something")),
-                needs: None,
                 argv: Some(vec![String::from("foo")]),
-                chdir: None,
                 command: String::from("something"),
-                creates: None,
-                removes: None,
+                ..Default::default()
             })],
         };
 

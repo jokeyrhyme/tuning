@@ -55,7 +55,7 @@ $ tuning
 # roadmap
 
 - [x] read config from user's HOME directory
-- [ ] support the "command" job
+- [x] support the "command" job
 - [ ] support the "file" job
 - [ ] support the "git" job
 - [ ] flag to point at a different config file
