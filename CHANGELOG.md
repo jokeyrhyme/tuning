@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - links to wiki documentation in README
 - read config file from default location
-- initial non-concurrent job runner
 - `"needs"` for inter-job dependencies
+- command: job type to run commands
+- concurrent job runner using 2 threads
 
 ## [0.1.5] - 2019-08-16
 

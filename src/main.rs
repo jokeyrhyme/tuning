@@ -6,7 +6,10 @@ use std::{fs, io};
 
 use dirs;
 
-use lib::{jobs, runner};
+use lib::{
+    jobs::{self, Main},
+    runner,
+};
 
 fn main() -> io::Result<()> {
     let config_path = dirs::config_dir()
@@ -16,8 +19,8 @@ fn main() -> io::Result<()> {
 
     println!("reading: {}", &config_path.display());
     let text = fs::read_to_string(&config_path)?;
-    let mut m = jobs::from_str(&text);
-    runner::run(&mut m.jobs);
+    let m = Main::from(text);
+    runner::run(m.jobs);
 
     Ok(())
 }

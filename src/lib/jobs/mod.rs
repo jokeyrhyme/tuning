@@ -84,6 +84,12 @@ impl Execute for Job {
 pub struct Main {
     pub jobs: Vec<Job>,
 }
+impl From<String> for Main {
+    fn from(s: String) -> Self {
+        // TODO: handle error
+        toml::from_str(&s).unwrap()
+    }
+}
 
 pub type Result = std::result::Result<Status, Error>;
 pub fn is_result_settled(result: &Result) -> bool {
@@ -119,14 +125,6 @@ impl Status {
     }
 }
 
-pub fn from_str<S>(s: S) -> Main
-where
-    S: AsRef<str>,
-{
-    // TODO: handle error
-    toml::from_str(&s.as_ref()).unwrap()
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -137,15 +135,17 @@ mod tests {
 
     #[test]
     fn command_toml() {
-        let input = r#"
+        let input = String::from(
+            r#"
             [[jobs]]
             name = "run something"
             type = "command"
             command = "something"
             argv = [ "foo" ]
-        "#;
+            "#,
+        );
 
-        let got: Main = from_str(&input);
+        let got = Main::from(input);
 
         let want = Main {
             jobs: vec![Job::Command(Command {
@@ -162,15 +162,17 @@ mod tests {
 
     #[test]
     fn file_toml() {
-        let input = r#"
+        let input = String::from(
+            r#"
             [[jobs]]
             name = "mkdir /tmp"
             type = "file"
             path = "/tmp"
             state = "directory"
-        "#;
+            "#,
+        );
 
-        let got: Main = from_str(&input);
+        let got = Main::from(input);
 
         let want = Main {
             jobs: vec![Job::File(File {

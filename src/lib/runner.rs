@@ -1,12 +1,18 @@
 #![deny(clippy::all)]
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use crate::jobs::{self, is_result_done, is_result_settled, Execute, Status};
 
-pub fn run(jobs: &mut Vec<impl Execute>) {
-    let mut results = HashMap::<String, jobs::Result>::new();
+// TODO: detect number of CPUs
+const MAX_THREADS: usize = 2;
 
+pub fn run(jobs: Vec<(impl Execute + Send + 'static)>) {
+    let mut results = HashMap::<String, jobs::Result>::new();
     // ensure every job has a registered Status
     jobs.iter().for_each(|job| {
         if job.needs().is_empty() {
@@ -16,35 +22,86 @@ pub fn run(jobs: &mut Vec<impl Execute>) {
         }
     });
 
-    while !is_all_settled(&results) {
-        jobs.iter().for_each(|job| {
-            let name = job.name();
-            // this .unwrap() is fine, as all jobs have a registered Status
-            match results.get(&name).unwrap() {
-                Ok(Status::Pending) => {
-                    results.insert(name.clone(), Ok(Status::InProgress));
-                    println!("job: {}: {:?}", &name, results.get(&name).unwrap());
-                    results.insert(name.clone(), job.execute());
-                    println!("job: {}: {:?}", &name, results.get(&name).unwrap());
+    let jobs_arc = Arc::new(Mutex::new(jobs));
+    let results_arc = Arc::new(Mutex::new(results));
+    let mut handles = Vec::<thread::JoinHandle<_>>::with_capacity(MAX_THREADS);
+    for _ in 0..MAX_THREADS {
+        let my_jobs_arc = jobs_arc.clone();
+        let my_results_arc = results_arc.clone();
+
+        let handle = thread::spawn(move || {
+            loop {
+                let current_job;
+                {
+                    // acquire locks
+                    let mut my_jobs = my_jobs_arc.lock().unwrap();
+                    let mut my_results = my_results_arc.lock().unwrap();
+
+                    // move Blocked jobs with satifisfied needs over to Pending
+                    for job in my_jobs.iter() {
+                        let name = job.name();
+                        if !is_equal_status(my_results.get(&name).unwrap(), &Status::Blocked) {
+                            continue;
+                        }
+                        if job
+                            .needs()
+                            .iter()
+                            .all(|n| is_result_done(my_results.get(n).unwrap()))
+                        {
+                            my_results.insert(name, Ok(Status::Pending));
+                        }
+                    }
+
+                    // check exit/terminate condition for thread
+                    if is_all_settled(&my_results) {
+                        return; // nothing left to do
+                    }
+                    // there must be at least one available job
+
+                    // cherry-pick first available job
+                    let index = match my_jobs.iter().enumerate().find(|(_, job)| {
+                        let name = job.name();
+                        // this .unwrap() is fine, as all jobs have a registered Status
+                        match my_results.get(&name).unwrap() {
+                            Ok(Status::Pending) => true,
+                            _ => false,
+                        }
+                    }) {
+                        Some((i, _)) => i,
+                        None => {
+                            // the only remaining jobs must already be InProgress
+                            // nothing left to do
+                            return;
+                        }
+                    };
+                    current_job = my_jobs.remove(index);
+                    let name = current_job.name();
+                    my_results.insert(name.clone(), Ok(Status::InProgress));
+                    println!("job: {}: {:?}", &name, my_results.get(&name).unwrap());
+
+                    // release/drop locks
                 }
-                _ => {
-                    println!("job: {}: {:?}", &name, results.get(&name).unwrap());
+
+                // execute job
+                let name = current_job.name();
+                let result = current_job.execute();
+
+                // record result of job
+                {
+                    // acquire locks
+                    let mut my_results = my_results_arc.lock().unwrap();
+
+                    my_results.insert(name.clone(), result);
+                    println!("job: {}: {:?}", &name, my_results.get(&name).unwrap());
+                    // release/drop locks
                 }
             }
         });
-        for job in jobs.iter() {
-            let name = job.name();
-            if !is_equal_status(results.get(&name).unwrap(), &Status::Blocked) {
-                continue;
-            }
-            if job
-                .needs()
-                .iter()
-                .all(|n| is_result_done(results.get(n).unwrap()))
-            {
-                results.insert(name, Ok(Status::Pending));
-            }
-        }
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().expect("worker thread failed");
     }
 }
 
@@ -61,47 +118,53 @@ fn is_equal_status(result: &jobs::Result, status: &Status) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        sync::{
-            atomic::{AtomicUsize, Ordering},
-            Arc, Mutex,
-        },
-        time::Instant,
-    };
+    use std::time::{Duration, Instant};
 
     use super::*;
 
     struct FakeJob {
-        r#fn: Box<dyn Fn() -> jobs::Result>,
         name: String,
         needs: Vec<String>,
+        result: jobs::Result,
+        sleep: Duration,
+        spy_arc: Arc<Mutex<FakeJobSpy>>,
+    }
+    impl Default for FakeJob {
+        fn default() -> Self {
+            Self {
+                name: String::new(),
+                needs: Vec::<String>::new(),
+                result: Ok(jobs::Status::Done),
+                sleep: Duration::from_millis(0),
+                spy_arc: Arc::new(Mutex::new(FakeJobSpy {
+                    calls: 0,
+                    time: None,
+                })),
+            }
+        }
     }
     impl FakeJob {
         fn new<S>(name: S, result: jobs::Result) -> (Self, Arc<Mutex<FakeJobSpy>>)
         where
             S: AsRef<str>,
         {
-            let spy = Arc::new(Mutex::new(FakeJobSpy {
-                calls: AtomicUsize::new(0),
-                time: None,
-            }));
-            let spy_arc = spy.clone();
-            let j = FakeJob {
-                r#fn: Box::new(move || {
-                    let mut my_spy = spy_arc.lock().unwrap();
-                    my_spy.calls.fetch_add(1, Ordering::Relaxed);
-                    my_spy.time = Some(Instant::now());
-                    result.clone()
-                }),
+            let job = FakeJob {
                 name: String::from(name.as_ref()),
-                needs: vec![],
+                result,
+                ..Default::default()
             };
-            (j, spy)
+            let spy_arc = job.spy_arc.clone();
+
+            (job, spy_arc)
         }
     }
     impl Execute for FakeJob {
         fn execute(&self) -> jobs::Result {
-            (self.r#fn)()
+            thread::sleep(self.sleep);
+            let mut my_spy = self.spy_arc.lock().unwrap();
+            my_spy.calls += 1;
+            my_spy.time = Some(Instant::now());
+            self.result.clone()
         }
         fn name(&self) -> String {
             self.name.clone()
@@ -112,8 +175,19 @@ mod tests {
     }
 
     struct FakeJobSpy {
-        calls: AtomicUsize,
+        calls: usize,
         time: Option<Instant>,
+    }
+    impl FakeJobSpy {
+        fn assert_called_once(&self) {
+            assert_eq!(self.calls, 1);
+            assert!(self.time.is_some());
+        }
+
+        fn assert_never_called(&self) {
+            assert_eq!(self.calls, 0);
+            assert!(self.time.is_none());
+        }
     }
 
     #[test]
@@ -121,15 +195,33 @@ mod tests {
         let (a, a_spy) = FakeJob::new("a", Ok(jobs::Status::NoChange(String::from("a"))));
         let (b, b_spy) = FakeJob::new("b", Ok(jobs::Status::Done));
 
-        let mut jobs = vec![a, b];
-        run(&mut jobs);
+        let jobs = vec![a, b];
+        run(jobs);
 
         let my_a_spy = a_spy.lock().unwrap();
         let my_b_spy = b_spy.lock().unwrap();
-        assert_eq!(my_a_spy.calls.load(Ordering::Relaxed), 1);
-        assert_eq!(my_b_spy.calls.load(Ordering::Relaxed), 1);
-        assert!(my_a_spy.time.is_some());
-        assert!(my_b_spy.time.is_some());
+        my_a_spy.assert_called_once();
+        my_b_spy.assert_called_once();
+    }
+
+    #[test]
+    fn run_executes_unordered_jobs_concurrently() {
+        let (mut a, a_spy) = FakeJob::new("a", Ok(jobs::Status::Done));
+        let (mut b, b_spy) = FakeJob::new("b", Ok(jobs::Status::Done));
+        a.sleep = Duration::from_millis(500);
+        b.sleep = Duration::from_millis(500);
+
+        let jobs = vec![a, b];
+        run(jobs);
+
+        let my_a_spy = a_spy.lock().unwrap();
+        let my_b_spy = b_spy.lock().unwrap();
+        my_a_spy.assert_called_once();
+        my_b_spy.assert_called_once();
+        // assert that both jobs finished very recently,
+        // that they had to have been executed concurrently
+        assert!(my_a_spy.time.expect("a").elapsed() < Duration::from_millis(50));
+        assert!(my_b_spy.time.expect("b").elapsed() < Duration::from_millis(50));
     }
 
     #[test]
@@ -138,15 +230,14 @@ mod tests {
         let (b, b_spy) = FakeJob::new("b", Ok(jobs::Status::NoChange(String::from("b"))));
         a.needs.push(String::from("b"));
 
-        let mut jobs = vec![a, b];
-        run(&mut jobs);
+        let jobs = vec![a, b];
+        run(jobs);
 
         let my_a_spy = a_spy.lock().unwrap();
         let my_b_spy = b_spy.lock().unwrap();
-        assert_eq!(my_a_spy.calls.load(Ordering::Relaxed), 1);
-        assert_eq!(my_b_spy.calls.load(Ordering::Relaxed), 1);
-        assert!(my_a_spy.time.is_some());
-        assert!(my_b_spy.time.is_some());
+        my_a_spy.assert_called_once();
+        my_b_spy.assert_called_once();
+        // assert that "a" finished after "b"
         assert!(my_a_spy.time.expect("a") > my_b_spy.time.expect("b"));
     }
 
@@ -156,15 +247,13 @@ mod tests {
         let (b, b_spy) = FakeJob::new("b", Err(jobs::Error::Other(String::from("something bad"))));
         a.needs.push(String::from("b"));
 
-        let mut jobs = vec![a, b];
-        run(&mut jobs);
+        let jobs = vec![a, b];
+        run(jobs);
 
         let my_a_spy = a_spy.lock().unwrap();
         let my_b_spy = b_spy.lock().unwrap();
-        assert_eq!(my_a_spy.calls.load(Ordering::Relaxed), 0);
-        assert_eq!(my_b_spy.calls.load(Ordering::Relaxed), 1);
-        assert!(my_a_spy.time.is_none());
-        assert!(my_b_spy.time.is_some());
+        my_a_spy.assert_never_called();
+        my_b_spy.assert_called_once();
     }
 
     #[test]
@@ -177,17 +266,14 @@ mod tests {
         a.needs.push(String::from("c"));
         b.needs.push(String::from("c"));
 
-        let mut jobs = vec![a, b, c];
-        run(&mut jobs);
+        let jobs = vec![a, b, c];
+        run(jobs);
 
         let my_a_spy = a_spy.lock().unwrap();
         let my_b_spy = b_spy.lock().unwrap();
         let my_c_spy = c_spy.lock().unwrap();
-        assert_eq!(my_a_spy.calls.load(Ordering::Relaxed), 0);
-        assert_eq!(my_b_spy.calls.load(Ordering::Relaxed), 1);
-        assert_eq!(my_c_spy.calls.load(Ordering::Relaxed), 1);
-        assert!(my_a_spy.time.is_none());
-        assert!(my_b_spy.time.is_some());
-        assert!(my_c_spy.time.is_some());
+        my_a_spy.assert_never_called();
+        my_b_spy.assert_called_once();
+        my_c_spy.assert_called_once();
     }
 }
