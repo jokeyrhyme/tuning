@@ -192,16 +192,27 @@ mod tests {
 
     #[test]
     fn run_executes_unordered_jobs() {
-        let (a, a_spy) = FakeJob::new("a", Ok(jobs::Status::NoChange(String::from("a"))));
-        let (b, b_spy) = FakeJob::new("b", Ok(jobs::Status::Done));
+        const MAX_COUNT: usize = 10;
+        let mut jobs = Vec::<FakeJob>::with_capacity(MAX_COUNT);
+        let mut spy_arcs = Vec::<Arc<Mutex<FakeJobSpy>>>::with_capacity(MAX_COUNT);
+        for i in 0..MAX_COUNT {
+            let (job, spy_arc) = FakeJob::new(
+                format!("{}", i),
+                match i % 2 {
+                    0 => Ok(jobs::Status::Done),
+                    _ => Ok(jobs::Status::NoChange(format!("{}", i))),
+                },
+            );
+            jobs.push(job);
+            spy_arcs.push(spy_arc);
+        }
 
-        let jobs = vec![a, b];
         run(jobs);
 
-        let my_a_spy = a_spy.lock().unwrap();
-        let my_b_spy = b_spy.lock().unwrap();
-        my_a_spy.assert_called_once();
-        my_b_spy.assert_called_once();
+        for spy_arc in spy_arcs {
+            let spy = spy_arc.lock().unwrap();
+            spy.assert_called_once();
+        }
     }
 
     #[test]
@@ -222,6 +233,74 @@ mod tests {
         // that they had to have been executed concurrently
         assert!(my_a_spy.time.expect("a").elapsed() < Duration::from_millis(50));
         assert!(my_b_spy.time.expect("b").elapsed() < Duration::from_millis(50));
+    }
+
+    #[test]
+    fn run_executes_jobs_with_complex_needs() {
+        const MAX_COUNT: usize = 100;
+        let mut jobs = Vec::<FakeJob>::with_capacity(MAX_COUNT);
+        let mut spy_arcs = Vec::<Arc<Mutex<FakeJobSpy>>>::with_capacity(MAX_COUNT);
+        for i in 0..MAX_COUNT {
+            let (mut job, spy_arc) = FakeJob::new(
+                format!("{}", i),
+                match i % 2 {
+                    0 => Ok(jobs::Status::Done),
+                    _ => Ok(jobs::Status::NoChange(format!("{}", i))),
+                },
+            );
+            match i % 10 {
+                2 => {
+                    job.needs = vec![format!("{}", i + 2)];
+                }
+                3 => {
+                    job.needs = vec![format!("{}", i - 3)];
+                }
+                4 => {
+                    job.needs = vec![format!("{}", i + 3)];
+                }
+                7 => {
+                    job.needs = vec![String::from("99")];
+                }
+                _ => { /* noop */ }
+            }
+            jobs.push(job);
+            spy_arcs.push(spy_arc);
+        }
+
+        run(jobs);
+
+        for i in 0..MAX_COUNT {
+            let spy_arc = &spy_arcs[i];
+            let spy = spy_arc.lock().unwrap();
+            spy.assert_called_once();
+            match i % 10 {
+                2 => {
+                    let spyx4_arc = &spy_arcs[i + 2];
+                    let spyx4 = spyx4_arc.lock().unwrap();
+                    // jobs ending in 2 should all run after the next job ending in 4
+                    assert!(spy.time.expect("x4") > spyx4.time.expect("x7"));
+                }
+                3 => {
+                    let spyx0_arc = &spy_arcs[i - 3];
+                    let spyx0 = spyx0_arc.lock().unwrap();
+                    // jobs ending in 3 should all run after the previous job ending in 0
+                    assert!(spy.time.expect("x3") > spyx0.time.expect("x7"));
+                }
+                4 => {
+                    let spyx7_arc = &spy_arcs[i + 3];
+                    let spyx7 = spyx7_arc.lock().unwrap();
+                    // jobs ending in 4 should all run after the next job ending in 7
+                    assert!(spy.time.expect("x4") > spyx7.time.expect("x7"));
+                }
+                7 => {
+                    let spy99_arc = &spy_arcs[99];
+                    let spy99 = spy99_arc.lock().unwrap();
+                    // jobs ending in 7 should all run after job #99
+                    assert!(spy.time.expect("x7") > spy99.time.expect("99"));
+                }
+                _ => { /* noop */ }
+            }
+        }
     }
 
     #[test]
