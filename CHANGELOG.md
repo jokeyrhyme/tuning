@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `"needs"` for inter-job dependencies
 - command: job type to run commands
 - concurrent job runner using 2 threads
+- file: job type to manipulate files
 
 ## [0.1.5] - 2019-08-16
 

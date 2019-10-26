@@ -57,6 +57,7 @@ $ tuning
 - [x] read config from user's HOME directory
 - [x] support the "command" job
 - [ ] support the "file" job
+- [ ] expand "~" and other references in paths
 - [ ] support the "git" job
 - [ ] flag to point at a different config file
 - [ ] `import` or `include` to help decompose large config files

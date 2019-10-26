@@ -12,7 +12,7 @@ use toml;
 use command::Command;
 use file::File;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Error {
     Other(String),
 }
@@ -110,7 +110,8 @@ pub fn is_result_done(result: &Result) -> bool {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Status {
-    Blocked, // when "needs" are not yet Done
+    Blocked,                 // when "needs" are not yet Done
+    Changed(String, String), // more specific kind of Done
     Done,
     InProgress,
     NoChange(String), // more specific kind of Done
@@ -119,7 +120,7 @@ pub enum Status {
 impl Status {
     pub fn is_done(&self) -> bool {
         match &self {
-            Self::Done | Self::NoChange(_) => true,
+            Self::Changed(_, _) | Self::Done | Self::NoChange(_) => true,
             _ => false,
         }
     }
@@ -178,6 +179,7 @@ mod tests {
             jobs: vec![Job::File(File {
                 name: Some(String::from("mkdir /tmp")),
                 needs: None,
+                force: None,
                 src: None,
                 path: PathBuf::from("/tmp"),
                 state: FileState::Directory,
