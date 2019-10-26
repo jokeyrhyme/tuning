@@ -8,13 +8,13 @@ version = "0.1.5"
 authors = ["Ron Waldon <jokeyrhyme@gmail.com>"]
 license = "MIT"
 edition = "2018"
-maintenance = { status = "experimental" }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 dirs = "2.0"
 lazy_static = "1.4"
+mktemp = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 subprocess = "0.1"
 toml = "0.5"
