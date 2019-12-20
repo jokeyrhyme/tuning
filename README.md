@@ -4,8 +4,8 @@ ansible-like tool with a smaller scope, focused primarily on complementing dotfi
 
 # status
 
-- no functionality yet,
-  collecting some thoughts together first
+- some functionality,
+  but still missing some basics that will make it actually useful
 
 # what?
 
