@@ -121,7 +121,7 @@ impl Status {
     pub fn is_done(&self) -> bool {
         match &self {
             Self::Changed(_, _) | Self::Done | Self::NoChange(_) => true,
-            _ => false,
+            Self::Blocked | Self::InProgress | Self::Pending => false,
         }
     }
 }

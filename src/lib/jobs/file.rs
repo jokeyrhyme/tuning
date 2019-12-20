@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn absent_makes_nochange_when_already_absent() -> Result<(), Error> {
         let file = File {
-            path: Temp::new_dir()?.join("missing.txt").to_path_buf(),
+            path: Temp::new_dir()?.join("missing.txt"),
             state: FileState::Absent,
             ..Default::default()
         };
@@ -310,9 +310,8 @@ mod tests {
     #[test]
     fn link_corrects_existing_symlink() -> Result<(), Error> {
         let src_old = Temp::new_file()?.to_path_buf();
-        let path = Temp::new_dir()?.join("symlink.txt");
         let file_old = File {
-            path: path.clone(),
+            path: Temp::new_dir()?.join("symlink.txt"),
             src: Some(src_old.clone()),
             state: FileState::Link,
             ..Default::default()
@@ -323,7 +322,7 @@ mod tests {
         let src = Temp::new_file()?.to_path_buf();
         let file = File {
             force: Some(true),
-            path: path.clone(),
+            path: file_old.path,
             src: Some(src.clone()),
             state: FileState::Link,
             ..Default::default()
