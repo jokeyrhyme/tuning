@@ -62,10 +62,7 @@ pub fn run(jobs: Vec<(impl Execute + Send + 'static)>) {
                     let index = match my_jobs.iter().enumerate().find(|(_, job)| {
                         let name = job.name();
                         // this .unwrap() is fine, as all jobs have a registered Status
-                        match my_results.get(&name).unwrap() {
-                            Ok(Status::Pending) => true,
-                            _ => false,
-                        }
+                        is_equal_status(my_results.get(&name).unwrap(), &Status::Pending)
                     }) {
                         Some((i, _)) => i,
                         None => {
