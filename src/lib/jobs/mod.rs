@@ -3,6 +3,8 @@
 mod command;
 mod file;
 
+use std::convert::TryFrom;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
 use toml;
@@ -21,6 +23,11 @@ pub enum Error {
     FileJob {
         #[from]
         source: file::Error,
+    },
+    #[error(transparent)]
+    ParseToml {
+        #[from]
+        source: toml::de::Error,
     },
     #[allow(dead_code)] // TODO: fake test-only errors should not be here
     #[error("fake test-only error")]
@@ -72,10 +79,10 @@ impl Execute for Job {
 pub struct Main {
     pub jobs: Vec<Job>,
 }
-impl From<String> for Main {
-    fn from(s: String) -> Self {
-        // TODO: handle error
-        toml::from_str(&s).unwrap()
+impl TryFrom<String> for Main {
+    type Error = Error;
+    fn try_from(s: String) -> std::result::Result<Self, Self::Error> {
+        toml::from_str(&s).map_err(|e| Error::ParseToml { source: e })
     }
 }
 
@@ -123,7 +130,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn command_toml() {
+    fn command_toml() -> std::result::Result<(), Error> {
         let input = String::from(
             r#"
             [[jobs]]
@@ -134,7 +141,7 @@ mod tests {
             "#,
         );
 
-        let got = Main::from(input);
+        let got = Main::try_from(input)?;
 
         let want = Main {
             jobs: vec![Job::Command(Command {
@@ -147,10 +154,12 @@ mod tests {
 
         assert_eq!(got.jobs.len(), 1);
         assert_eq!(got, want);
+
+        Ok(())
     }
 
     #[test]
-    fn file_toml() {
+    fn file_toml() -> std::result::Result<(), Error> {
         let input = String::from(
             r#"
             [[jobs]]
@@ -161,7 +170,7 @@ mod tests {
             "#,
         );
 
-        let got = Main::from(input);
+        let got = Main::try_from(input)?;
 
         let want = Main {
             jobs: vec![Job::File(File {
@@ -176,5 +185,7 @@ mod tests {
 
         assert_eq!(got.jobs.len(), 1);
         assert_eq!(got, want);
+
+        Ok(())
     }
 }
