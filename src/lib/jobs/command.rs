@@ -4,7 +4,8 @@ use std::{env, io, path::PathBuf, sync::Mutex, thread};
 
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use subprocess::{Exec, Redirection};
+use subprocess::{Exec, PopenError, Redirection};
+use thiserror::Error as ThisError;
 
 use super::Status;
 
@@ -37,7 +38,7 @@ impl Default for Command {
     }
 }
 impl Command {
-    pub fn execute(&self) -> super::Result {
+    pub fn execute(&self) -> Result {
         match &self.creates {
             Some(p) => {
                 if p.exists() {
@@ -72,18 +73,39 @@ impl Command {
             .cwd(&cwd)
             .stdout(Redirection::Pipe)
             .stderr(Redirection::Pipe)
-            .popen()?;
+            .popen()
+            .map_err(|e| Error::CommandBegin {
+                cmd: self.command.clone(),
+                source: e,
+            })?;
         let (mut stderr, mut stdout) = (p.stderr.take().unwrap(), p.stdout.take().unwrap());
         thread::spawn(move || io::copy(&mut stderr, &mut io::stderr()));
         thread::spawn(move || io::copy(&mut stdout, &mut io::stdout()));
-        let status = p.wait()?;
+        let status = p.wait().map_err(|e| Error::CommandWait {
+            cmd: self.command.clone(),
+            source: e,
+        })?;
         if status.success() {
             Ok(Status::Done)
         } else {
-            Err(super::Error::Other(String::from("non-zero exit status")))
+            Err(Error::NonZeroExitStatus {
+                cmd: self.command.clone(),
+            })
         }
     }
 }
+
+#[derive(Debug, ThisError)]
+pub enum Error {
+    #[error("`{}` could not begin: {}", cmd, source)]
+    CommandBegin { cmd: String, source: PopenError },
+    #[error("`{}` could not continue: {}", cmd, source)]
+    CommandWait { cmd: String, source: PopenError },
+    #[error("`{}` exited with non-zero status code", cmd)]
+    NonZeroExitStatus { cmd: String },
+}
+
+pub type Result = std::result::Result<Status, Error>;
 
 #[cfg(test)]
 mod tests {

@@ -6,10 +6,46 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error as ThisError;
 
 use super::Status;
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, ThisError)]
+pub enum Error {
+    #[error("unable to link {}->{}: {}", src.display(), path.display(), source)]
+    CreateLink {
+        path: PathBuf,
+        src: PathBuf,
+        source: io::Error,
+    },
+    #[error("unable to create {}: {}", path.display(), source)]
+    CreatePath { path: PathBuf, source: io::Error },
+    #[error("{} already exists", path.display())]
+    PathExists { path: PathBuf },
+    #[allow(dead_code)] // TODO: test-only errors should not be here
+    #[error("unable to read {}: {}", path.display(), source)]
+    ReadPath { path: PathBuf, source: io::Error },
+    #[error("unable to remove {}: {}", path.display(), source)]
+    RemovePath { path: PathBuf, source: io::Error },
+    #[error("{} not found", src.display())]
+    SrcNotFound { src: PathBuf },
+    #[error("state={} requires src", format!("{:?}", state).to_lowercase())]
+    StateRequiresSrc { state: FileState },
+    #[error("state={} is not yet implemented", format!("{:?}", state).to_lowercase())]
+    StateNotImplemented { state: FileState },
+    #[allow(dead_code)] // TODO: test-only errors should not be here
+    #[error(transparent)]
+    TempPath { source: io::Error },
+    #[error("unable to write {}: {}", path.display(), source)]
+    WritePath { path: PathBuf, source: io::Error },
+}
+impl PartialEq for Error {
+    fn eq(&self, other: &Error) -> bool {
+        format!("{:?}", self) == format!("{:?}", other)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FileState {
     Absent,
@@ -43,24 +79,23 @@ impl Default for File {
     }
 }
 impl File {
-    pub fn execute(&self) -> super::Result {
+    pub fn execute(&self) -> Result {
         match self.state {
             FileState::Absent => execute_absent(&self.path),
             FileState::Directory => execute_directory(&self.path, self.force.unwrap_or(false)),
             FileState::Link => match &self.src {
                 Some(s) => execute_link(s, &self.path, self.force.unwrap_or(false)),
-                None => Err(super::Error::Other(String::from("state=link requires src"))),
+                None => Err(Error::StateRequiresSrc { state: self.state }),
             },
             FileState::Touch => execute_touch(&self.path),
-            _ => Err(super::Error::Other(format!(
-                "state={} not implemented",
-                format!("{:?}", &self.state).to_lowercase(),
-            ))),
+            _ => Err(Error::StateNotImplemented { state: self.state }),
         }
     }
 }
 
-fn execute_absent<P>(path: P) -> super::Result
+pub type Result = std::result::Result<Status, Error>;
+
+fn execute_absent<P>(path: P) -> Result
 where
     P: AsRef<Path>,
 {
@@ -69,18 +104,22 @@ where
         return Ok(Status::NoChange(format!("{}", p.display())));
     }
 
-    if p.is_dir() {
-        fs::remove_dir_all(&p)?;
+    (if p.is_dir() {
+        fs::remove_dir_all(&p)
     } else {
-        fs::remove_file(&p)?;
-    }
+        fs::remove_file(&p)
+    })
+    .map_err(|e| Error::RemovePath {
+        path: p.to_path_buf(),
+        source: e,
+    })?;
     Ok(Status::Changed(
         format!("{}", p.display()),
         String::from("absent"),
     ))
 }
 
-fn execute_directory<P>(path: P, force: bool) -> super::Result
+fn execute_directory<P>(path: P, force: bool) -> Result
 where
     P: AsRef<Path>,
 {
@@ -90,7 +129,9 @@ where
         return Ok(Status::NoChange(format!("directory: {}", p.display())));
     } else if p.exists() {
         if !force {
-            return Err(super::Error::Other(format!("exists: {}", p.display())));
+            return Err(Error::PathExists {
+                path: p.to_path_buf(),
+            });
         }
         previously = String::from("not directory");
         execute_absent(&p)?;
@@ -98,20 +139,22 @@ where
         previously = String::from("absent");
     }
 
-    fs::create_dir_all(&p)?;
+    fs_create_dir_all(&p)?;
     Ok(Status::Changed(
         previously,
         format!("directory: {}", p.display()),
     ))
 }
 
-fn execute_link<P>(src: P, dest: P, force: bool) -> super::Result
+fn execute_link<P>(src: P, dest: P, force: bool) -> Result
 where
     P: AsRef<Path>,
 {
     let s = src.as_ref();
     if std::fs::symlink_metadata(&s).is_err() && !force {
-        return Err(super::Error::Other(format!("absent src: {}", &s.display())));
+        return Err(Error::SrcNotFound {
+            src: s.to_path_buf(),
+        });
     }
 
     let d = dest.as_ref();
@@ -123,10 +166,9 @@ where
             return Ok(Status::NoChange(previously));
         }
         if !force {
-            return Err(super::Error::Other(format!(
-                "existing link: {}",
-                previously
-            )));
+            return Err(Error::PathExists {
+                path: d.to_path_buf(),
+            });
         }
     };
     // dest does not exist, or is wrong symlink, or is not a symlink
@@ -139,7 +181,9 @@ where
             if force {
                 execute_absent(&d)?;
             } else {
-                return Err(super::Error::Other(previously));
+                return Err(Error::PathExists {
+                    path: d.to_path_buf(),
+                });
             }
         }
         Err(_) => {
@@ -149,7 +193,11 @@ where
         }
     }
 
-    symbolic_link(&s, &d)?;
+    symbolic_link(&s, &d).map_err(|e| Error::CreateLink {
+        path: d.to_path_buf(),
+        src: s.to_path_buf(),
+        source: e,
+    })?;
 
     Ok(Status::Changed(
         previously,
@@ -157,7 +205,7 @@ where
     ))
 }
 
-fn execute_touch<P>(path: P) -> super::Result
+fn execute_touch<P>(path: P) -> Result
 where
     P: AsRef<Path>,
 {
@@ -169,11 +217,32 @@ where
     if let Some(parent) = p.parent() {
         execute_directory(&parent, false)?;
     }
-    fs::write(p, "")?;
+    fs_write(p, "")?;
     Ok(Status::Changed(
         String::from("absent"),
         format!("{}", p.display()),
     ))
+}
+
+fn fs_create_dir_all<P>(p: P) -> std::result::Result<(), Error>
+where
+    P: AsRef<Path>,
+{
+    fs::create_dir_all(&p).map_err(|e| Error::CreatePath {
+        path: p.as_ref().to_path_buf(),
+        source: e,
+    })
+}
+
+fn fs_write<P, C>(p: P, c: C) -> std::result::Result<(), Error>
+where
+    P: AsRef<Path>,
+    C: AsRef<[u8]>,
+{
+    fs::write(&p, c).map_err(|e| Error::WritePath {
+        path: p.as_ref().to_path_buf(),
+        source: e,
+    })
 }
 
 #[cfg(not(windows))]
@@ -201,20 +270,18 @@ where
 mod tests {
     use mktemp::Temp;
 
-    use crate::jobs::Error;
-
     use super::*;
 
     #[test]
-    fn absent_deletes_existing_file() -> Result<(), Error> {
+    fn absent_deletes_existing_file() -> std::result::Result<(), Error> {
         let file = File {
-            path: Temp::new_file()?.to_path_buf(),
+            path: temp_file()?.to_path_buf(),
             state: FileState::Absent,
             ..Default::default()
         };
 
-        fs::create_dir_all(&file.path.parent().unwrap())?;
-        fs::write(&file.path, "")?;
+        fs_create_dir_all(&file.path.parent().unwrap())?;
+        fs_write(&file.path, "")?;
         let got = file.execute()?;
 
         assert_eq!(
@@ -226,14 +293,14 @@ mod tests {
     }
 
     #[test]
-    fn absent_deletes_existing_directory() -> Result<(), Error> {
+    fn absent_deletes_existing_directory() -> std::result::Result<(), Error> {
         let file = File {
-            path: Temp::new_dir()?.to_path_buf(),
+            path: temp_dir()?.to_path_buf(),
             state: FileState::Absent,
             ..Default::default()
         };
 
-        fs::create_dir_all(&file.path)?;
+        fs_create_dir_all(&file.path)?;
         let got = file.execute()?;
 
         assert_eq!(
@@ -245,9 +312,9 @@ mod tests {
     }
 
     #[test]
-    fn absent_makes_nochange_when_already_absent() -> Result<(), Error> {
+    fn absent_makes_nochange_when_already_absent() -> std::result::Result<(), Error> {
         let file = File {
-            path: Temp::new_dir()?.join("missing.txt"),
+            path: temp_dir()?.join("missing.txt"),
             state: FileState::Absent,
             ..Default::default()
         };
@@ -259,16 +326,16 @@ mod tests {
     }
 
     #[test]
-    fn link_symlinks_src_to_path() -> Result<(), Error> {
-        let src = Temp::new_file()?.to_path_buf();
+    fn link_symlinks_src_to_path() -> std::result::Result<(), Error> {
+        let src = temp_file()?.to_path_buf();
         let file = File {
-            path: Temp::new_file()?.to_path_buf(),
+            path: temp_file()?.to_path_buf(),
             src: Some(src.clone()),
             state: FileState::Link,
             ..Default::default()
         };
 
-        fs::write(&src, "hello")?;
+        fs_write(&src, "hello")?;
         let got = file.execute()?;
 
         assert_eq!(
@@ -278,22 +345,22 @@ mod tests {
                 format!("{} -> {}", &src.display(), file.path.display())
             )
         );
-        assert_eq!(fs::read_to_string(&file.path)?, "hello");
+        assert_eq!(fs_read(&file.path)?, "hello");
         Ok(())
     }
 
     #[test]
-    fn link_symlinks_src_to_path_in_new_directory() -> Result<(), Error> {
-        let src = Temp::new_file()?.to_path_buf();
+    fn link_symlinks_src_to_path_in_new_directory() -> std::result::Result<(), Error> {
+        let src = temp_file()?.to_path_buf();
         let file = File {
-            path: Temp::new_dir()?.join("symlink.txt"),
+            path: temp_dir()?.join("symlink.txt"),
             src: Some(src.clone()),
             state: FileState::Link,
             ..Default::default()
         };
 
-        fs::create_dir_all(file.path.parent().unwrap())?;
-        fs::write(&src, "hello")?;
+        fs_create_dir_all(file.path.parent().unwrap())?;
+        fs_write(&src, "hello")?;
         let got = file.execute()?;
 
         assert_eq!(
@@ -303,23 +370,23 @@ mod tests {
                 format!("{} -> {}", &src.display(), file.path.display())
             )
         );
-        assert_eq!(fs::read_to_string(&file.path)?, "hello");
+        assert_eq!(fs_read(&file.path)?, "hello");
         Ok(())
     }
 
     #[test]
-    fn link_corrects_existing_symlink() -> Result<(), Error> {
-        let src_old = Temp::new_file()?.to_path_buf();
+    fn link_corrects_existing_symlink() -> std::result::Result<(), Error> {
+        let src_old = temp_file()?.to_path_buf();
         let file_old = File {
-            path: Temp::new_dir()?.join("symlink.txt"),
+            path: temp_dir()?.join("symlink.txt"),
             src: Some(src_old.clone()),
             state: FileState::Link,
             ..Default::default()
         };
-        fs::write(&src_old, "hello_old")?;
+        fs_write(&src_old, "hello_old")?;
         file_old.execute()?;
 
-        let src = Temp::new_file()?.to_path_buf();
+        let src = temp_file()?.to_path_buf();
         let file = File {
             force: Some(true),
             path: file_old.path,
@@ -328,7 +395,7 @@ mod tests {
             ..Default::default()
         };
 
-        fs::write(&src, "hello")?;
+        fs_write(&src, "hello")?;
         let got = file.execute()?;
 
         assert_eq!(
@@ -338,23 +405,23 @@ mod tests {
                 format!("{} -> {}", &src.display(), file.path.display())
             )
         );
-        assert_eq!(fs::read_to_string(&file.path)?, "hello");
+        assert_eq!(fs_read(&file.path)?, "hello");
         Ok(())
     }
 
     #[test]
-    fn link_removes_existing_file_at_path() -> Result<(), Error> {
-        let src = Temp::new_file()?.to_path_buf();
+    fn link_removes_existing_file_at_path() -> std::result::Result<(), Error> {
+        let src = temp_file()?.to_path_buf();
         let file = File {
             force: Some(true),
-            path: Temp::new_file()?.to_path_buf(),
+            path: temp_file()?.to_path_buf(),
             src: Some(src.clone()),
             state: FileState::Link,
             ..Default::default()
         };
 
-        fs::write(&src, "hello")?;
-        fs::write(&file.path, "existing")?;
+        fs_write(&src, "hello")?;
+        fs_write(&file.path, "existing")?;
         let got = file.execute()?;
 
         assert_eq!(
@@ -364,23 +431,23 @@ mod tests {
                 format!("{} -> {}", &src.display(), file.path.display())
             )
         );
-        assert_eq!(fs::read_to_string(&file.path)?, "hello");
+        assert_eq!(fs_read(&file.path)?, "hello");
         Ok(())
     }
 
     #[test]
-    fn link_removes_existing_directory_at_path() -> Result<(), Error> {
-        let src = Temp::new_file()?.to_path_buf();
+    fn link_removes_existing_directory_at_path() -> std::result::Result<(), Error> {
+        let src = temp_file()?.to_path_buf();
         let file = File {
             force: Some(true),
-            path: Temp::new_dir()?.to_path_buf(),
+            path: temp_dir()?.to_path_buf(),
             src: Some(src.clone()),
             state: FileState::Link,
             ..Default::default()
         };
 
-        fs::write(&src, "hello")?;
-        fs::create_dir_all(&file.path)?;
+        fs_write(&src, "hello")?;
+        fs_create_dir_all(&file.path)?;
         let got = file.execute()?;
 
         assert_eq!(
@@ -390,15 +457,15 @@ mod tests {
                 format!("{} -> {}", &src.display(), file.path.display())
             )
         );
-        assert_eq!(fs::read_to_string(&file.path)?, "hello");
+        assert_eq!(fs_read(&file.path)?, "hello");
         Ok(())
     }
 
     #[test]
-    fn link_without_force_requires_src_to_exist() -> Result<(), Error> {
-        let src = Temp::new_file()?.to_path_buf();
+    fn link_without_force_requires_src_to_exist() -> std::result::Result<(), Error> {
+        let src = temp_file()?.to_path_buf();
         let file = File {
-            path: Temp::new_dir()?.to_path_buf(),
+            path: temp_dir()?.to_path_buf(),
             src: Some(src.clone()),
             state: FileState::Link,
             ..Default::default()
@@ -407,39 +474,33 @@ mod tests {
         let got = file.execute();
 
         assert!(got.is_err());
-        assert_eq!(
-            got.err().unwrap(),
-            Error::Other(format!("absent src: {}", src.display()))
-        );
+        assert_eq!(got.err().unwrap(), Error::SrcNotFound { src },);
         Ok(())
     }
 
     #[test]
-    fn link_without_force_requires_path_to_not_exist() -> Result<(), Error> {
-        let src = Temp::new_file()?.to_path_buf();
+    fn link_without_force_requires_path_to_not_exist() -> std::result::Result<(), Error> {
+        let src = temp_file()?.to_path_buf();
         let file = File {
-            path: Temp::new_dir()?.to_path_buf(),
+            path: temp_dir()?.to_path_buf(),
             src: Some(src.clone()),
             state: FileState::Link,
             ..Default::default()
         };
 
-        fs::write(&src, "hello")?;
-        fs::create_dir_all(&file.path)?;
+        fs_write(&src, "hello")?;
+        fs_create_dir_all(&file.path)?;
         let got = file.execute();
 
         assert!(got.is_err());
-        assert_eq!(
-            got.err().unwrap(),
-            Error::Other(format!("existing: {}", file.path.display()))
-        );
+        assert_eq!(got.err().unwrap(), Error::PathExists { path: file.path },);
         Ok(())
     }
 
     #[test]
-    fn touch_creates_new_empty_file() -> Result<(), Error> {
+    fn touch_creates_new_empty_file() -> std::result::Result<(), Error> {
         let file = File {
-            path: Temp::new_dir()?.join("new.txt"),
+            path: temp_dir()?.join("new.txt"),
             state: FileState::Touch,
             ..Default::default()
         };
@@ -454,18 +515,35 @@ mod tests {
     }
 
     #[test]
-    fn touch_makes_nochange_for_existing_path() -> Result<(), Error> {
+    fn touch_makes_nochange_for_existing_path() -> std::result::Result<(), Error> {
         let file = File {
-            path: Temp::new_file()?.to_path_buf(),
+            path: temp_file()?.to_path_buf(),
             state: FileState::Touch,
             ..Default::default()
         };
 
-        fs::create_dir_all(file.path.parent().unwrap())?;
-        fs::write(&file.path, "")?;
+        fs_create_dir_all(file.path.parent().unwrap())?;
+        fs_write(&file.path, "")?;
         let got = file.execute()?;
 
         assert_eq!(got, Status::NoChange(format!("{}", file.path.display())));
         Ok(())
+    }
+
+    fn fs_read<P>(p: P) -> std::result::Result<String, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let pb = p.as_ref().to_path_buf();
+        fs::read_to_string(&pb).map_err(|e| Error::ReadPath {
+            path: pb,
+            source: e,
+        })
+    }
+    fn temp_dir() -> std::result::Result<mktemp::Temp, Error> {
+        Temp::new_dir().map_err(|e| Error::TempPath { source: e })
+    }
+    fn temp_file() -> std::result::Result<mktemp::Temp, Error> {
+        Temp::new_file().map_err(|e| Error::TempPath { source: e })
     }
 }

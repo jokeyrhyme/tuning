@@ -3,40 +3,28 @@
 mod command;
 mod file;
 
-use std::{fmt, io};
-
 use serde::{Deserialize, Serialize};
-use subprocess::PopenError;
+use thiserror::Error as ThisError;
 use toml;
 
 use command::Command;
 use file::File;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, ThisError)]
 pub enum Error {
-    Other(String),
-}
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Other(s) => s,
-            }
-        )
-    }
-}
-impl std::error::Error for Error {}
-impl From<PopenError> for Error {
-    fn from(src: PopenError) -> Self {
-        Error::Other(format!("{:?}", src))
-    }
-}
-impl From<io::Error> for Error {
-    fn from(src: io::Error) -> Self {
-        Error::Other(format!("{:?}", src))
-    }
+    #[error(transparent)]
+    CommandJob {
+        #[from]
+        source: command::Error,
+    },
+    #[error(transparent)]
+    FileJob {
+        #[from]
+        source: file::Error,
+    },
+    #[allow(dead_code)] // TODO: fake test-only errors should not be here
+    #[error("fake test-only error")]
+    SomethingBad,
 }
 
 pub trait Execute {
@@ -54,8 +42,8 @@ pub enum Job {
 impl Execute for Job {
     fn execute(&self) -> Result {
         match self {
-            Job::Command(j) => j.execute(),
-            Job::File(j) => j.execute(),
+            Job::Command(j) => j.execute().map_err(|e| Error::CommandJob { source: e }),
+            Job::File(j) => j.execute().map_err(|e| Error::FileJob { source: e }),
         }
     }
     fn name(&self) -> String {
