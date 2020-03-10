@@ -79,10 +79,10 @@ impl Execute for Job {
 pub struct Main {
     pub jobs: Vec<Job>,
 }
-impl TryFrom<String> for Main {
+impl TryFrom<&str> for Main {
     type Error = Error;
-    fn try_from(s: String) -> std::result::Result<Self, Self::Error> {
-        toml::from_str(&s).map_err(|e| Error::ParseToml { source: e })
+    fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
+        toml::from_str(s).map_err(|e| Error::ParseToml { source: e })
     }
 }
 
@@ -131,15 +131,13 @@ mod tests {
 
     #[test]
     fn command_toml() -> std::result::Result<(), Error> {
-        let input = String::from(
-            r#"
+        let input = r#"
             [[jobs]]
             name = "run something"
             type = "command"
             command = "something"
             argv = [ "foo" ]
-            "#,
-        );
+            "#;
 
         let got = Main::try_from(input)?;
 
@@ -160,15 +158,13 @@ mod tests {
 
     #[test]
     fn file_toml() -> std::result::Result<(), Error> {
-        let input = String::from(
-            r#"
+        let input = r#"
             [[jobs]]
             name = "mkdir /tmp"
             type = "file"
             path = "/tmp"
             state = "directory"
-            "#,
-        );
+            "#;
 
         let got = Main::try_from(input)?;
 
