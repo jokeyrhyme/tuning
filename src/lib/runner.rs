@@ -6,10 +6,23 @@ use std::{
     thread,
 };
 
+use thiserror::Error as ThisError;
+
 use crate::jobs::{self, is_result_done, is_result_settled, Execute, Status};
 
 // TODO: detect number of CPUs
 const MAX_THREADS: usize = 2;
+
+#[derive(Debug, ThisError)]
+pub enum Error {
+    #[error(transparent)]
+    Job {
+        #[from]
+        source: jobs::Error,
+    },
+}
+
+// pub type Result = std::result::Result<(), Error>;
 
 pub fn run(jobs: Vec<(impl Execute + Send + 'static)>) {
     let mut results = HashMap::<String, jobs::Result>::new();
@@ -161,7 +174,7 @@ mod tests {
             let mut my_spy = self.spy_arc.lock().unwrap();
             my_spy.calls += 1;
             my_spy.time = Some(Instant::now());
-            self.result.clone()
+            result_clone(&self.result)
         }
         fn name(&self) -> String {
             self.name.clone()
@@ -320,7 +333,7 @@ mod tests {
     #[test]
     fn run_does_not_execute_ordered_job_when_needs_are_not_done() {
         let (mut a, a_spy) = FakeJob::new("a", Ok(jobs::Status::Done));
-        let (b, b_spy) = FakeJob::new("b", Err(jobs::Error::Other(String::from("something bad"))));
+        let (b, b_spy) = FakeJob::new("b", Err(jobs::Error::SomethingBad));
         a.needs.push(String::from("b"));
 
         let jobs = vec![a, b];
@@ -335,8 +348,7 @@ mod tests {
     #[test]
     fn run_does_not_execute_ordered_job_when_some_needs_are_not_done() {
         let (mut a, a_spy) = FakeJob::new("a", Ok(jobs::Status::Done));
-        let (mut b, b_spy) =
-            FakeJob::new("b", Err(jobs::Error::Other(String::from("something bad"))));
+        let (mut b, b_spy) = FakeJob::new("b", Err(jobs::Error::SomethingBad));
         let (c, c_spy) = FakeJob::new("c", Ok(jobs::Status::Done));
         a.needs.push(String::from("b"));
         a.needs.push(String::from("c"));
@@ -351,5 +363,12 @@ mod tests {
         my_a_spy.assert_never_called();
         my_b_spy.assert_called_once();
         my_c_spy.assert_called_once();
+    }
+
+    fn result_clone(result: &jobs::Result) -> jobs::Result {
+        match result {
+            Ok(s) => Ok(s.clone()),
+            Err(_) => Err(jobs::Error::SomethingBad),
+        }
     }
 }
