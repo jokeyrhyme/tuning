@@ -55,11 +55,13 @@ $ tuning
 # roadmap
 
 - [x] read config from user's HOME directory
+- [x] `needs` to support optional sequencing of jobs
 - [x] support the "command" job
-- [ ] support the "file" job
-- [ ] expand "~" and other references in paths
+- [x] support the "file" job
+- [ ] resolve references to special paths (e.g. ~) (#9)
 - [ ] support the "git" job
 - [ ] flag to point at a different config file
 - [ ] `import` or `include` to help decompose large config files
 - [ ] `when` to support conditional execution of jobs
-- [x] `needs` to support optional sequencing of jobs
+- [ ] specify that a job needs a certain OS
+- [ ] specify that a job needs certain external tools
