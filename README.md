@@ -58,7 +58,7 @@ $ tuning
 - [x] `needs` to support optional sequencing of jobs
 - [x] support the "command" job
 - [x] support the "file" job
-- [ ] resolve references to special paths (e.g. ~) (#9)
+- [x] resolve references to path expressions (e.g. ~) ([#9](https://github.com/jokeyrhyme/tuning/issues/9))
 - [ ] support the "git" job
 - [ ] flag to point at a different config file
 - [ ] `import` or `include` to help decompose large config files

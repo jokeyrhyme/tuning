@@ -8,13 +8,18 @@ use dirs;
 use thiserror::Error as ThisError;
 
 use lib::{
-    facts::Facts,
+    facts::{self, Facts},
     jobs::{self, Main},
     runner, template,
 };
 
 #[derive(Debug, ThisError)]
 enum Error {
+    #[error(transparent)]
+    Facts {
+        #[from]
+        source: facts::Error,
+    },
     #[error(transparent)]
     Io {
         #[from]
@@ -43,7 +48,7 @@ fn main() -> Result {
     println!("reading: {}", &config_path.display());
     let text = fs::read_to_string(&config_path)?;
 
-    let facts = Facts::default();
+    let facts = Facts::gather()?;
     let rendered = template::render(text, &facts)?;
 
     let m = Main::try_from(rendered.as_str())?;

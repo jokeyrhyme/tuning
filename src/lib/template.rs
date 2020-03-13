@@ -37,6 +37,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
 
     use super::super::facts::Facts;
 
@@ -82,6 +83,32 @@ mod tests {
             "#;
         let facts = Facts::default();
         let want = String::from(input);
+        let result = render(input, &facts);
+        assert!(result.is_ok());
+        if let Ok(got) = result {
+            assert_eq!(got, want);
+        }
+    }
+
+    #[test]
+    fn render_toml_with_expressions() {
+        let input = r#"
+            [[jobs]]
+            name = "{{ cache_dir }} {{ home_dir }}"
+            type = "command"
+            command = "{{ config_dir }}"
+            "#;
+        let facts = Facts {
+            cache_dir: PathBuf::from("my_cache_dir"),
+            config_dir: PathBuf::from("my_config_dir"),
+            home_dir: PathBuf::from("my_home_dir"),
+        };
+        let want = r#"
+            [[jobs]]
+            name = "my_cache_dir my_home_dir"
+            type = "command"
+            command = "my_config_dir"
+            "#;
         let result = render(input, &facts);
         assert!(result.is_ok());
         if let Ok(got) = result {
