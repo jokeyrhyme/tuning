@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - command: job type to run commands
 - concurrent job runner using 2 threads
 - file: job type to manipulate files
+- support `{{ home_dir }}` and other expressions in template
 
 ## [0.1.5] - 2019-08-16
 
