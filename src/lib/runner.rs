@@ -250,8 +250,8 @@ mod tests {
         my_b_spy.assert_called_once();
         // assert that both jobs finished very recently,
         // that they had to have been executed concurrently
-        assert!(my_a_spy.time.expect("a").elapsed() < Duration::from_millis(50));
-        assert!(my_b_spy.time.expect("b").elapsed() < Duration::from_millis(50));
+        assert!(my_a_spy.time.expect("a").elapsed() < Duration::from_millis(100));
+        assert!(my_b_spy.time.expect("b").elapsed() < Duration::from_millis(100));
     }
 
     #[test]
