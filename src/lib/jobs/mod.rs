@@ -55,14 +55,9 @@ impl Execute for Job {
         }
     }
     fn name(&self) -> String {
-        let name: Option<String> = match self {
-            Job::Command(j) => Some(j.name.clone().unwrap_or_else(|| j.name())),
-
-            Job::File(j) => j.name.clone(),
-        };
-        match name {
-            Some(n) => n,
-            None => format!("{:?}", self),
+        match self {
+            Job::Command(j) => j.name.clone().unwrap_or_else(|| j.name()),
+            Job::File(j) => j.name.clone().unwrap_or_else(|| j.name()),
         }
     }
     fn needs(&self) -> Vec<String> {
