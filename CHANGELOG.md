@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- colored output for job status
 - generate friendlier names for command jobs
 
 ## [0.1.6] - 2020-03-13

@@ -3,8 +3,9 @@
 mod command;
 mod file;
 
-use std::convert::TryFrom;
+use std::{convert::TryFrom, fmt};
 
+use colored::*;
 use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
 use toml;
@@ -88,6 +89,12 @@ impl TryFrom<&str> for Main {
 }
 
 pub type Result = std::result::Result<Status, Error>;
+pub fn result_display(result: &Result) -> String {
+    match result {
+        Ok(s) => format!("{}", s),
+        Err(e) => format!("{:#?}", e).red().to_string(),
+    }
+}
 pub fn is_result_settled(result: &Result) -> bool {
     match result {
         Ok(s) => match s {
@@ -111,7 +118,26 @@ pub enum Status {
     Done,
     InProgress,
     NoChange(String), // more specific kind of Done
-    Pending,          // when no "needs" or "needs" are all Done
+    Pending,          // when no "needs"; or "needs" are all Done
+}
+impl fmt::Display for Status {
+    // TODO: should Display include terminal output concerns?
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Blocked => write!(f, "{}", "blocked".red().dimmed()),
+            Self::Changed(from, to) => write!(
+                f,
+                "{}: {} => {}",
+                "changed".yellow(),
+                from.yellow().dimmed(),
+                to.yellow()
+            ),
+            Self::Done => write!(f, "{}", "done".blue()),
+            Self::InProgress => write!(f, "{}", "inprogress".cyan()),
+            Self::NoChange(s) => write!(f, "{}: {}", "nochange".green(), s.green()),
+            Self::Pending => write!(f, "{}", "pending".white()),
+        }
+    }
 }
 impl Status {
     pub fn is_done(&self) -> bool {

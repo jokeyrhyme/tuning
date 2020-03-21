@@ -24,6 +24,7 @@ pub enum Error {
 
 // pub type Result = std::result::Result<(), Error>;
 
+// TODO: consider extracting the concern of println!ing Status
 pub fn run(jobs: Vec<(impl Execute + Send + 'static)>) {
     let mut results = HashMap::<String, jobs::Result>::new();
     // ensure every job has a registered Status
@@ -87,7 +88,11 @@ pub fn run(jobs: Vec<(impl Execute + Send + 'static)>) {
                     current_job = my_jobs.remove(index);
                     let name = current_job.name();
                     my_results.insert(name.clone(), Ok(Status::InProgress));
-                    println!("job: {}: {:?}", &name, my_results.get(&name).unwrap());
+                    println!(
+                        "job: {}: {}",
+                        &name,
+                        jobs::result_display(my_results.get(&name).unwrap())
+                    );
 
                     // release/drop locks
                 }
@@ -102,7 +107,11 @@ pub fn run(jobs: Vec<(impl Execute + Send + 'static)>) {
                     let mut my_results = my_results_arc.lock().unwrap();
 
                     my_results.insert(name.clone(), result);
-                    println!("job: {}: {:?}", &name, my_results.get(&name).unwrap());
+                    println!(
+                        "job: {}: {}",
+                        &name,
+                        jobs::result_display(my_results.get(&name).unwrap())
+                    );
                     // release/drop locks
                 }
             }
