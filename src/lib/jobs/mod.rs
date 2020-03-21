@@ -54,8 +54,9 @@ impl Execute for Job {
         }
     }
     fn name(&self) -> String {
-        let name = match self {
-            Job::Command(j) => j.name.clone(),
+        let name: Option<String> = match self {
+            Job::Command(j) => Some(j.name.clone().unwrap_or_else(|| j.name())),
+
             Job::File(j) => j.name.clone(),
         };
         match name {
