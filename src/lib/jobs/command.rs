@@ -93,6 +93,27 @@ impl Command {
             })
         }
     }
+
+    pub fn name(&self) -> String {
+        if let Some(n) = &self.name {
+            return n.clone();
+        }
+        let mut parts = Vec::<String>::new();
+        if let Some(c) = &self.creates {
+            parts.push(format!("[ ! -e {} ] &&", c.display()));
+        }
+        if let Some(r) = &self.removes {
+            parts.push(format!("[ -e {} ] &&", r.display()));
+        }
+        if let Some(c) = &self.chdir {
+            parts.push(format!("cd {} &&", c.display()));
+        }
+        parts.push(self.command.clone());
+        if let Some(a) = &self.argv {
+            parts.extend(a.clone());
+        }
+        parts.join(" ")
+    }
 }
 
 #[derive(Debug, ThisError)]
@@ -167,5 +188,64 @@ mod tests {
             ),
             Err(_) => unreachable!(), // fail
         }
+    }
+
+    #[test]
+    fn name_with_command() {
+        let cmd = Command {
+            command: String::from("foo"),
+            ..Default::default()
+        };
+        let got = cmd.name();
+        let want = r#"foo"#;
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn name_with_command_and_argv() {
+        let cmd = Command {
+            argv: Some(vec![String::from("--bar"), String::from("baz")]),
+            command: String::from("foo"),
+            ..Default::default()
+        };
+        let got = cmd.name();
+        let want = r#"foo --bar baz"#;
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn name_with_command_and_chdir() {
+        let cmd = Command {
+            chdir: Some(PathBuf::from("bar")),
+            command: String::from("foo"),
+            ..Default::default()
+        };
+        let got = cmd.name();
+        let want = r#"cd bar && foo"#;
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn name_with_command_and_creates() {
+        let cmd = Command {
+            command: String::from("foo"),
+            creates: Some(PathBuf::from("bar")),
+            ..Default::default()
+        };
+        let got = cmd.name();
+        let want = r#"[ ! -e bar ] && foo"#;
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn name_with_command_and_removes() {
+        let cmd = Command {
+            command: String::from("foo"),
+            removes: Some(PathBuf::from("bar")),
+            ..Default::default()
+        };
+        let got = cmd.name();
+        let want = r#"[ -e bar ] && foo"#;
+        assert_eq!(got, want);
     }
 }
