@@ -91,6 +91,23 @@ impl File {
             _ => Err(Error::StateNotImplemented { state: self.state }),
         }
     }
+
+    pub fn name(&self) -> String {
+        let force = self.force.unwrap_or(false);
+        let pd = self.path.display();
+        match self.state {
+            FileState::Absent => format!("rm -r{} {}", if force { "f" } else { "" }, pd),
+            FileState::Directory => format!("mkdir -p {}", pd),
+            FileState::Link => format!(
+                "ln -s{} {} {}",
+                if force { "f" } else { "" },
+                self.src.clone().unwrap_or_default().display(),
+                pd
+            ),
+            FileState::Touch => format!("touch {}", pd),
+            _ => format!("{:#?}", self),
+        }
+    }
 }
 
 pub type Result = std::result::Result<Status, Error>;
@@ -495,6 +512,82 @@ mod tests {
         assert!(got.is_err());
         assert_eq!(got.err().unwrap(), Error::PathExists { path: file.path },);
         Ok(())
+    }
+
+    #[test]
+    fn name_absent() {
+        let file = File {
+            path: PathBuf::from("foo"),
+            state: FileState::Absent,
+            ..Default::default()
+        };
+        let got = file.name();
+        let want = "rm -r foo";
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn name_absent_force() {
+        let file = File {
+            force: Some(true),
+            path: PathBuf::from("foo"),
+            state: FileState::Absent,
+            ..Default::default()
+        };
+        let got = file.name();
+        let want = "rm -rf foo";
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn name_directory() {
+        let file = File {
+            path: PathBuf::from("foo"),
+            state: FileState::Directory,
+            ..Default::default()
+        };
+        let got = file.name();
+        let want = "mkdir -p foo";
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn name_link() {
+        let file = File {
+            path: PathBuf::from("foo"),
+            src: Some(PathBuf::from("bar")),
+            state: FileState::Link,
+            ..Default::default()
+        };
+        let got = file.name();
+        let want = "ln -s bar foo";
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn name_link_force() {
+        let file = File {
+            force: Some(true),
+            path: PathBuf::from("foo"),
+            src: Some(PathBuf::from("bar")),
+            state: FileState::Link,
+            ..Default::default()
+        };
+        let got = file.name();
+        let want = "ln -sf bar foo";
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn name_touch() {
+        let file = File {
+            path: PathBuf::from("foo"),
+            state: FileState::Touch,
+            ..Default::default()
+        };
+        let got = file.name();
+        let want = "touch foo";
+        assert_eq!(got, want);
     }
 
     #[test]

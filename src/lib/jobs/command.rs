@@ -95,9 +95,6 @@ impl Command {
     }
 
     pub fn name(&self) -> String {
-        if let Some(n) = &self.name {
-            return n.clone();
-        }
         let mut parts = Vec::<String>::new();
         if let Some(c) = &self.creates {
             parts.push(format!("[ ! -e {} ] &&", c.display()));
@@ -197,7 +194,7 @@ mod tests {
             ..Default::default()
         };
         let got = cmd.name();
-        let want = r#"foo"#;
+        let want = "foo";
         assert_eq!(got, want);
     }
 
@@ -209,7 +206,7 @@ mod tests {
             ..Default::default()
         };
         let got = cmd.name();
-        let want = r#"foo --bar baz"#;
+        let want = "foo --bar baz";
         assert_eq!(got, want);
     }
 
@@ -221,7 +218,7 @@ mod tests {
             ..Default::default()
         };
         let got = cmd.name();
-        let want = r#"cd bar && foo"#;
+        let want = "cd bar && foo";
         assert_eq!(got, want);
     }
 
@@ -233,7 +230,7 @@ mod tests {
             ..Default::default()
         };
         let got = cmd.name();
-        let want = r#"[ ! -e bar ] && foo"#;
+        let want = "[ ! -e bar ] && foo";
         assert_eq!(got, want);
     }
 
@@ -245,7 +242,7 @@ mod tests {
             ..Default::default()
         };
         let got = cmd.name();
-        let want = r#"[ -e bar ] && foo"#;
+        let want = "[ -e bar ] && foo";
         assert_eq!(got, want);
     }
 }
