@@ -405,7 +405,6 @@ mod tests {
             path: file_old.path,
             src: Some(src.clone()),
             state: FileState::Link,
-            ..Default::default()
         };
 
         fs_write(&src, "hello")?;
@@ -430,7 +429,6 @@ mod tests {
             path: temp_file()?.to_path_buf(),
             src: Some(src.clone()),
             state: FileState::Link,
-            ..Default::default()
         };
 
         fs_write(&src, "hello")?;
@@ -456,7 +454,6 @@ mod tests {
             path: temp_dir()?.to_path_buf(),
             src: Some(src.clone()),
             state: FileState::Link,
-            ..Default::default()
         };
 
         fs_write(&src, "hello")?;
@@ -567,7 +564,6 @@ mod tests {
             path: PathBuf::from("foo"),
             src: Some(PathBuf::from("bar")),
             state: FileState::Link,
-            ..Default::default()
         };
         let got = file.name();
         let want = "ln -sf bar foo";
