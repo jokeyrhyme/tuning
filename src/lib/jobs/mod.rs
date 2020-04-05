@@ -43,33 +43,50 @@ pub trait Execute {
 
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase", tag = "type")]
-pub enum Job {
-    Command(Command),
-    File(File),
+pub struct Job {
+    #[serde(flatten)]
+    metadata: Metadata,
+
+    #[serde(flatten)]
+    spec: Spec,
 }
 impl Execute for Job {
     fn execute(&self) -> Result {
-        match self {
-            Job::Command(j) => j.execute().map_err(|e| Error::CommandJob { source: e }),
-            Job::File(j) => j.execute().map_err(|e| Error::FileJob { source: e }),
+        match &self.spec {
+            Spec::Command(j) => j.execute().map_err(|e| Error::CommandJob { source: e }),
+            Spec::File(j) => j.execute().map_err(|e| Error::FileJob { source: e }),
         }
     }
     fn name(&self) -> String {
-        match self {
-            Job::Command(j) => j.name.clone().unwrap_or_else(|| j.name()),
-            Job::File(j) => j.name.clone().unwrap_or_else(|| j.name()),
+        match &self.spec {
+            Spec::Command(j) => self.metadata.name.clone().unwrap_or_else(|| j.name()),
+            Spec::File(j) => self.metadata.name.clone().unwrap_or_else(|| j.name()),
         }
     }
     fn needs(&self) -> Vec<String> {
-        let needs = match self {
-            Job::Command(j) => j.needs.clone(),
-            Job::File(j) => j.needs.clone(),
-        };
-        match needs {
-            Some(n) => n,
-            None => vec![],
+        self.metadata.needs.clone().unwrap_or_else(|| vec![])
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
+pub struct Metadata {
+    name: Option<String>,
+    needs: Option<Vec<String>>,
+}
+impl Default for Metadata {
+    fn default() -> Self {
+        Self {
+            name: None,
+            needs: None,
         }
     }
+}
+
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase", tag = "type")]
+pub enum Spec {
+    Command(Command),
+    File(File),
 }
 
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
@@ -164,12 +181,17 @@ mod tests {
         let got = Main::try_from(input)?;
 
         let want = Main {
-            jobs: vec![Job::Command(Command {
-                name: Some(String::from("run something")),
-                argv: Some(vec![String::from("foo")]),
-                command: String::from("something"),
-                ..Default::default()
-            })],
+            jobs: vec![Job {
+                metadata: Metadata {
+                    name: Some(String::from("run something")),
+                    ..Default::default()
+                },
+                spec: Spec::Command(Command {
+                    argv: Some(vec![String::from("foo")]),
+                    command: String::from("something"),
+                    ..Default::default()
+                }),
+            }],
         };
 
         assert_eq!(got.jobs.len(), 1);
@@ -191,14 +213,18 @@ mod tests {
         let got = Main::try_from(input)?;
 
         let want = Main {
-            jobs: vec![Job::File(File {
-                name: Some(String::from("mkdir /tmp")),
-                needs: None,
-                force: None,
-                src: None,
-                path: PathBuf::from("/tmp"),
-                state: FileState::Directory,
-            })],
+            jobs: vec![Job {
+                metadata: Metadata {
+                    name: Some(String::from("mkdir /tmp")),
+                    ..Default::default()
+                },
+                spec: Spec::File(File {
+                    force: None,
+                    src: None,
+                    path: PathBuf::from("/tmp"),
+                    state: FileState::Directory,
+                }),
+            }],
         };
 
         assert_eq!(got.jobs.len(), 1);

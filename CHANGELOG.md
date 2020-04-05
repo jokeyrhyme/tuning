@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - colorized output for job status
 - generate friendlier names for command jobs
 - generate friendlier names for file jobs
+- internally centralise handling of common fields like `"name"`
 
 ## [0.1.6] - 2020-03-13
 

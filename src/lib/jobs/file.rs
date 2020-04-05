@@ -59,8 +59,6 @@ pub enum FileState {
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase", tag = "type")]
 pub struct File {
-    pub name: Option<String>,
-    pub needs: Option<Vec<String>>,
     pub force: Option<bool>,
     pub path: PathBuf,
     pub src: Option<PathBuf>,
@@ -69,8 +67,6 @@ pub struct File {
 impl Default for File {
     fn default() -> Self {
         Self {
-            name: None,
-            needs: None,
             force: None,
             path: PathBuf::new(),
             src: None,
@@ -409,7 +405,6 @@ mod tests {
             path: file_old.path,
             src: Some(src.clone()),
             state: FileState::Link,
-            ..Default::default()
         };
 
         fs_write(&src, "hello")?;
@@ -434,7 +429,6 @@ mod tests {
             path: temp_file()?.to_path_buf(),
             src: Some(src.clone()),
             state: FileState::Link,
-            ..Default::default()
         };
 
         fs_write(&src, "hello")?;
@@ -460,7 +454,6 @@ mod tests {
             path: temp_dir()?.to_path_buf(),
             src: Some(src.clone()),
             state: FileState::Link,
-            ..Default::default()
         };
 
         fs_write(&src, "hello")?;
@@ -571,7 +564,6 @@ mod tests {
             path: PathBuf::from("foo"),
             src: Some(PathBuf::from("bar")),
             state: FileState::Link,
-            ..Default::default()
         };
         let got = file.name();
         let want = "ln -sf bar foo";

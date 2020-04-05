@@ -16,8 +16,6 @@ lazy_static! {
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase", tag = "type")]
 pub struct Command {
-    pub name: Option<String>,
-    pub needs: Option<Vec<String>>,
     pub argv: Option<Vec<String>>,
     pub chdir: Option<PathBuf>,
     pub command: String,
@@ -27,8 +25,6 @@ pub struct Command {
 impl Default for Command {
     fn default() -> Self {
         Command {
-            name: None,
-            needs: None,
             argv: None,
             chdir: None,
             command: String::new(),
