@@ -35,15 +35,17 @@ pub fn render<S>(input: S, facts: &Facts) -> Result<String>
 where
     S: AsRef<str>,
 {
-    Main::try_from(input.as_ref())?; // check that we have valid TOML first
-
     let context = Context::from_serialize(facts).map_err(|e| Error::Context { source: e })?;
-    Tera::one_off(
+    let output = Tera::one_off(
         &DIR_EXPRESSION_RE.replace_all(input.as_ref(), "_dir | addslashes }}"),
         &context,
         false,
     )
-    .map_err(|e| Error::Render { source: e })
+    .map_err(|e| Error::Render { source: e })?;
+
+    Main::try_from(output.as_str())?; // check that we have valid TOML first
+
+    Ok(output)
 }
 
 #[cfg(test)]
@@ -108,19 +110,24 @@ mod tests {
             name = "{{ cache_dir }} {{ home_dir }}"
             type = "command"
             command = "{{ config_dir }}"
+            when = {{ is_os_linux or is_os_macos }}
             "#;
         let facts = Facts {
             cache_dir: PathBuf::from("c:\\my_cache_dir"), // like Windows
             config_dir: PathBuf::from("my_config_dir"),
             home_dir: PathBuf::from("my_home_dir"),
+            is_os_linux: false,
+            is_os_macos: false,
+            ..Default::default()
         };
         let want = r#"
             [[jobs]]
             name = "c:\\my_cache_dir my_home_dir"
             type = "command"
             command = "my_config_dir"
+            when = false
             "#;
-        let result = render(input, &facts);
+        let result = dbg!(render(input, &facts));
         assert!(result.is_ok());
         if let Ok(got) = result {
             assert_eq!(got, want);

@@ -39,6 +39,7 @@ pub trait Execute {
     fn execute(&self) -> Result;
     fn name(&self) -> String;
     fn needs(&self) -> Vec<String>;
+    fn when(&self) -> bool;
 }
 
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
@@ -66,18 +67,24 @@ impl Execute for Job {
     fn needs(&self) -> Vec<String> {
         self.metadata.needs.clone().unwrap_or_else(|| vec![])
     }
+    fn when(&self) -> bool {
+        self.metadata.when
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct Metadata {
     name: Option<String>,
     needs: Option<Vec<String>>,
+    #[serde(default = "default_when_value")]
+    when: bool,
 }
 impl Default for Metadata {
     fn default() -> Self {
         Self {
             name: None,
             needs: None,
+            when: true,
         }
     }
 }
@@ -110,7 +117,7 @@ pub fn result_display(result: &Result) -> String {
 pub fn is_result_settled(result: &Result) -> bool {
     match result {
         Ok(s) => match s {
-            Status::Blocked => true,
+            Status::Blocked | Status::Skipped => true,
             _ => s.is_done(),
         },
         Err(_) => true,
@@ -131,6 +138,7 @@ pub enum Status {
     InProgress,
     NoChange(String), // more specific kind of Done
     Pending,          // when no "needs"; or "needs" are all Done
+    Skipped,          // when "when" is false
 }
 impl fmt::Display for Status {
     // TODO: should Display include terminal output concerns?
@@ -148,6 +156,7 @@ impl fmt::Display for Status {
             Self::InProgress => write!(f, "{}", "inprogress".cyan()),
             Self::NoChange(s) => write!(f, "{}: {}", "nochange".green(), s.green()),
             Self::Pending => write!(f, "{}", "pending".white()),
+            Self::Skipped => write!(f, "{}", "skipped".blue()),
         }
     }
 }
@@ -155,9 +164,13 @@ impl Status {
     pub fn is_done(&self) -> bool {
         match &self {
             Self::Changed(_, _) | Self::Done | Self::NoChange(_) => true,
-            Self::Blocked | Self::InProgress | Self::Pending => false,
+            Self::Blocked | Self::InProgress | Self::Pending | Self::Skipped => false,
         }
     }
+}
+
+fn default_when_value() -> bool {
+    true
 }
 
 #[cfg(test)]
@@ -223,6 +236,37 @@ mod tests {
                     src: None,
                     path: PathBuf::from("/tmp"),
                     state: FileState::Directory,
+                }),
+            }],
+        };
+
+        assert_eq!(got.jobs.len(), 1);
+        assert_eq!(got, want);
+
+        Ok(())
+    }
+
+    #[test]
+    fn absent_when_defaults_to_true() -> std::result::Result<(), Error> {
+        let input = r#"
+            [[jobs]]
+            name = "run something"
+            type = "command"
+            command = "something"
+            "#;
+
+        let got = Main::try_from(input)?;
+
+        let want = Main {
+            jobs: vec![Job {
+                metadata: Metadata {
+                    name: Some(String::from("run something")),
+                    when: true,
+                    ..Default::default()
+                },
+                spec: Spec::Command(Command {
+                    command: String::from("something"),
+                    ..Default::default()
                 }),
             }],
         };

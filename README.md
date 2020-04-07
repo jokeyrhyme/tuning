@@ -50,6 +50,8 @@ $ tuning
 
 # documentation
 
+- read about [job metadata](./docs/metadata.md)
+- read about [job file template rendering](./docs/template.md)
 - read about the [jobs configuration file format](https://github.com/jokeyrhyme/tuning/wiki/Jobs-definition)
 
 # roadmap
@@ -59,9 +61,10 @@ $ tuning
 - [x] support the "command" job
 - [x] support the "file" job
 - [x] resolve references to path expressions (e.g. ~) ([#9](https://github.com/jokeyrhyme/tuning/issues/9))
+- [x] `when` to support conditional jobs
+- [x] specify that a job needs a certain OS
+- [ ] `needs_any` for flexible sequencing of jobs
 - [ ] support the "git" job
 - [ ] flag to point at a different config file
 - [ ] `import` or `include` to help decompose large config files
-- [ ] `when` to support conditional execution of jobs
-- [ ] specify that a job needs a certain OS
 - [ ] specify that a job needs certain external tools

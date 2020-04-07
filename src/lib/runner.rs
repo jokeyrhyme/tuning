@@ -51,16 +51,22 @@ pub fn run(jobs: Vec<(impl Execute + Send + 'static)>) {
                     let mut my_jobs = my_jobs_arc.lock().unwrap();
                     let mut my_results = my_results_arc.lock().unwrap();
 
+                    // move jobs with false "when" over to Skipped
+                    for job in my_jobs.iter() {
+                        let name = job.name();
+                        if !job.when() {
+                            my_results.insert(name.clone(), Ok(Status::Skipped));
+                        }
+                    }
+
                     // move Blocked jobs with satifisfied needs over to Pending
                     for job in my_jobs.iter() {
                         let name = job.name();
-                        if !is_equal_status(my_results.get(&name).unwrap(), &Status::Blocked) {
-                            continue;
-                        }
-                        if job
-                            .needs()
-                            .iter()
-                            .all(|n| is_result_done(my_results.get(n).unwrap()))
+                        if is_equal_status(my_results.get(&name).unwrap(), &Status::Blocked)
+                            && job
+                                .needs()
+                                .iter()
+                                .all(|n| is_result_done(my_results.get(n).unwrap()))
                         {
                             my_results.insert(name, Ok(Status::Pending));
                         }
@@ -147,6 +153,7 @@ mod tests {
         result: jobs::Result,
         sleep: Duration,
         spy_arc: Arc<Mutex<FakeJobSpy>>,
+        when: bool,
     }
     impl Default for FakeJob {
         fn default() -> Self {
@@ -159,6 +166,7 @@ mod tests {
                     calls: 0,
                     time: None,
                 })),
+                when: true,
             }
         }
     }
@@ -191,6 +199,9 @@ mod tests {
         fn needs(&self) -> Vec<String> {
             self.needs.clone()
         }
+        fn when(&self) -> bool {
+            self.when
+        }
     }
 
     struct FakeJobSpy {
@@ -207,6 +218,22 @@ mod tests {
             assert_eq!(self.calls, 0);
             assert!(self.time.is_none());
         }
+    }
+
+    #[test]
+    fn run_does_not_execute_job_with_false_when_or_needs_job_with_false_when() {
+        let (mut a, a_spy) = FakeJob::new("a", Ok(jobs::Status::Done));
+        a.when = false;
+        let (mut b, b_spy) = FakeJob::new("b", Ok(jobs::Status::Done));
+        b.needs.push(String::from("a"));
+
+        let jobs = vec![a, b];
+        run(jobs);
+
+        let my_a_spy = a_spy.lock().unwrap();
+        my_a_spy.assert_never_called();
+        let my_b_spy = b_spy.lock().unwrap();
+        my_b_spy.assert_never_called();
     }
 
     #[test]
