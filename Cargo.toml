@@ -16,6 +16,7 @@ colored = "1"
 dirs = "2"
 lazy_static = "1"
 mktemp = "0.4"
+regex = "1"
 serde = { version = "1", features = ["derive"] }
 subprocess = "0.1"
 tera = { version = "1", default-features = false }
