@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `"when"` for conditional jobs
+- new [facts](./docs/template.md) for OS-detection
+- document available template expression values / [facts](./docs/template.md)
+
 ### Fixed
 
 - escape path expressions so Windows paths are valid TOML (#17)

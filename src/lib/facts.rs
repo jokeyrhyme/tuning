@@ -1,6 +1,6 @@
 #![deny(clippy::all)]
 
-use std::path::PathBuf;
+use std::{env::consts::OS, path::PathBuf};
 
 use dirs;
 use serde::Serialize;
@@ -21,6 +21,9 @@ pub struct Facts {
     pub cache_dir: PathBuf,
     pub config_dir: PathBuf,
     pub home_dir: PathBuf,
+    pub is_os_linux: bool,
+    pub is_os_macos: bool,
+    pub is_os_windows: bool,
 }
 impl Facts {
     pub fn gather() -> Result {
@@ -28,6 +31,9 @@ impl Facts {
             cache_dir: dirs::cache_dir().ok_or(Error::CacheDir)?,
             config_dir: dirs::config_dir().ok_or(Error::ConfigDir)?,
             home_dir: dirs::home_dir().ok_or(Error::HomeDir)?,
+            is_os_linux: OS == "linux",
+            is_os_macos: OS == "macos",
+            is_os_windows: OS == "windows",
         })
     }
 }
@@ -37,6 +43,9 @@ impl Default for Facts {
             cache_dir: PathBuf::new(),
             config_dir: PathBuf::new(),
             home_dir: PathBuf::new(),
+            is_os_linux: false,
+            is_os_macos: false,
+            is_os_windows: false,
         }
     }
 }
