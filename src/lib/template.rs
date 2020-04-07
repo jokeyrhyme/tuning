@@ -2,6 +2,8 @@
 
 use std::convert::TryFrom;
 
+use lazy_static::lazy_static;
+use regex::Regex;
 use tera::{self, Context, Tera};
 use thiserror::Error as ThisError;
 
@@ -9,6 +11,10 @@ use super::{
     facts::Facts,
     jobs::{self, Main},
 };
+
+lazy_static! {
+    static ref DIR_EXPRESSION_RE: Regex = Regex::new(r"_dir\s*\}\}").unwrap();
+}
 
 #[derive(Debug, ThisError)]
 pub enum Error {
@@ -32,7 +38,12 @@ where
     Main::try_from(input.as_ref())?; // check that we have valid TOML first
 
     let context = Context::from_serialize(facts).map_err(|e| Error::Context { source: e })?;
-    Tera::one_off(input.as_ref(), &context, false).map_err(|e| Error::Render { source: e })
+    Tera::one_off(
+        &DIR_EXPRESSION_RE.replace_all(input.as_ref(), "_dir | addslashes }}"),
+        &context,
+        false,
+    )
+    .map_err(|e| Error::Render { source: e })
 }
 
 #[cfg(test)]
@@ -99,13 +110,13 @@ mod tests {
             command = "{{ config_dir }}"
             "#;
         let facts = Facts {
-            cache_dir: PathBuf::from("my_cache_dir"),
+            cache_dir: PathBuf::from("c:\\my_cache_dir"), // like Windows
             config_dir: PathBuf::from("my_config_dir"),
             home_dir: PathBuf::from("my_home_dir"),
         };
         let want = r#"
             [[jobs]]
-            name = "my_cache_dir my_home_dir"
+            name = "c:\\my_cache_dir my_home_dir"
             type = "command"
             command = "my_config_dir"
             "#;
