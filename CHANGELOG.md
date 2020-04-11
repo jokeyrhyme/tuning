@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - new [facts](./docs/template.md) for OS-detection
 - document available template expression values / [facts](./docs/template.md)
 
+### Changed
+
+- also check for tuning/main.toml in ~/.dotfiles
+
 ### Fixed
 
 - escape path expressions so Windows paths are valid TOML (#17)
