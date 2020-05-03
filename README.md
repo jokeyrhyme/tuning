@@ -63,8 +63,8 @@ $ tuning
 - [x] resolve references to path expressions (e.g. ~) ([#9](https://github.com/jokeyrhyme/tuning/issues/9))
 - [x] `when` to support conditional jobs
 - [x] specify that a job needs a certain OS
+- [x] specify that a job needs certain executables
 - [ ] `needs_any` for flexible sequencing of jobs
 - [ ] support the "git" job
 - [ ] flag to point at a different config file
 - [ ] `import` or `include` to help decompose large config files
-- [ ] specify that a job needs certain external tools
