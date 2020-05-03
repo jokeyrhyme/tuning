@@ -54,7 +54,7 @@ impl Command {
 
         // we want exactly one "command" to use stdout at a time,
         // at least until we decide how sharing stdout should work
-        let _ = MUTEX.lock().unwrap();
+        let _lock = MUTEX.lock().unwrap();
 
         let args = match &self.argv {
             Some(a) => a.clone(),

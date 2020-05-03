@@ -22,6 +22,12 @@ as defined over in the [dirs crate](https://crates.io/crates/dirs)
 
 e.g. ~/.config (Linux)
 
+### has_executable (exe:string -> boolean)
+
+`true` if a given executable is available (i.e. in the PATH)
+
+e.g. `{{ has_executable(exe="tuning") }}`
+
 ### home_dir (path)
 
 as defined over in the [dirs crate](https://crates.io/crates/dirs)

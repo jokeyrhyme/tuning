@@ -8,7 +8,6 @@ use std::{convert::TryFrom, fmt};
 use colored::*;
 use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
-use toml;
 
 use command::Command;
 use file::File;

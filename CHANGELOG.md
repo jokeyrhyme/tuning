@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `"when"` for conditional jobs
 - new [facts](./docs/template.md) for OS-detection
 - document available template expression values / [facts](./docs/template.md)
+- `{{ has_executable(foo) }}` template function to check for executables
 
 ### Changed
 
