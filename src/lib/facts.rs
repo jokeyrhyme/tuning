@@ -2,7 +2,6 @@
 
 use std::{env::consts::OS, path::PathBuf};
 
-use dirs;
 use serde::Serialize;
 use thiserror::Error as ThisError;
 

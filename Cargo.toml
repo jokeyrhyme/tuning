@@ -22,3 +22,4 @@ subprocess = "0.1"
 tera = { version = "1", default-features = false }
 thiserror = "1"
 toml = "0.5"
+which = "3"
