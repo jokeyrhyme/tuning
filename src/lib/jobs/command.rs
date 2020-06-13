@@ -1,5 +1,3 @@
-#![deny(clippy::all)]
-
 use std::{env, io, path::PathBuf, sync::Mutex, thread};
 
 use lazy_static::lazy_static;

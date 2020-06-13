@@ -1,5 +1,3 @@
-#![deny(clippy::all)]
-
 use std::{env::consts::OS, path::PathBuf};
 
 use serde::Serialize;

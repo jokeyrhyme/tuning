@@ -1,5 +1,3 @@
-#![deny(clippy::all)]
-
 use std::{collections::HashMap, convert::TryFrom};
 
 use lazy_static::lazy_static;

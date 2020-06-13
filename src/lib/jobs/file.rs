@@ -1,5 +1,3 @@
-#![deny(clippy::all)]
-
 use std::{
     fs, io,
     path::{Path, PathBuf},
