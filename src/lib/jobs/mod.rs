@@ -62,7 +62,7 @@ impl Execute for Job {
         }
     }
     fn needs(&self) -> Vec<String> {
-        self.metadata.needs.clone().unwrap_or_else(|| vec![])
+        self.metadata.needs.clone().unwrap_or_default()
     }
     fn when(&self) -> bool {
         self.metadata.when
