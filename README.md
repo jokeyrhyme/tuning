@@ -68,3 +68,8 @@ $ tuning
 - [ ] support the "git" job
 - [ ] flag to point at a different config file
 - [ ] `import` or `include` to help decompose large config files
+
+# see also
+
+- https://github.com/rash-sh/rash
+- https://www.ansible.com/
