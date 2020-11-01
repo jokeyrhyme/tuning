@@ -2,6 +2,8 @@
 
 ansible-like tool with a smaller scope, focused primarily on complementing dotfiles for cross-machine bliss
 
+MOVED: https://gitlab.com/jokeyrhyme/tuning
+
 # status
 
 - some functionality,
